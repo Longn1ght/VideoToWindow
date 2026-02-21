@@ -128,7 +128,8 @@ private:
 	BOOL bInsteadColor;
 	int Width;
 	int Height;
-	int RectMinSize;
+	int RectMinSizeLong;
+	float RectMinSizeShort;
 	RECT rect;
 	COMPUTE_WINDOW_METHOD ComputeMethod;
 
@@ -136,6 +137,7 @@ private:
 	AUDIOPARAMS a;
 
 	WNDPARAMS *pHeader;
+	vector<WNDPARAMS*> WindowsPool;//窗口池，存储所有窗口的指针，降低窗口创建和销毁的开销s
 	int wndnum;
 	int startx;
 	int starty;

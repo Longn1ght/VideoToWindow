@@ -221,15 +221,8 @@ VTWPARAMS::VTWPARAMS()
 	bInsteadColor = WHITE;
 	Width = GetSystemMetrics(SM_CXSCREEN);
 	Height = GetSystemMetrics(SM_CYSCREEN);
-    // 默认使用短边的 1% 作为最小矩形边长，至少为 4 像素，且上限为 16 像素
-    {
-        int minSide = (Width < Height) ? Width : Height;
-        int defSize = (minSide * 1) / 100; // 1%
-        const int maxRectMin = 16;
-        if (defSize < 4) defSize = 4;
-        if (defSize > maxRectMin) defSize = maxRectMin;
-        RectMinSize = defSize;
-    }
+	RectMinSizeLong = (Width + Height) / 200;
+	RectMinSizeShort = RectMinSizeLong * Height / Width;
 	ComputeMethod = COMPUTE_WINDOW_METHOD::EXTEND_METHOD;
 
 	startx = 0;
@@ -291,10 +284,18 @@ VTWPARAMS::~VTWPARAMS()
 		delete current;
 		current = next;
 	}
+	while (!WindowsPool.empty())
+	{
+		current = WindowsPool.back();
+		WindowsPool.pop_back();
+		if (current->hwnd) DestroyWindow(current->hwnd);
+		delete current;
+	}
 	// 确保音频线程已停止并清理资源
 	a.bThreadRunning = FALSE;
 	if (a.hFreeBufferEvent) SetEvent(a.hFreeBufferEvent);  
-	if (a.hThread) {
+	if (a.hThread) 
+	{
 		WaitForSingleObject(a.hThread, INFINITE);
 		CloseHandle(a.hThread);
 	}
@@ -367,7 +368,8 @@ int VTWPARAMS::GetHeight()
 
 VOID VTWPARAMS::SetRectMinSize(int size)
 {
-	RectMinSize = size;
+	RectMinSizeLong = size;
+	RectMinSizeShort = size * Height / Width;
 	return;
 }
 
@@ -595,7 +597,7 @@ VOID VTWPARAMS::RectToWindow(int x, int y, int width, int height)
 
 VOID VTWPARAMS::DisplayWindowFrame()
 {
-	//cout << "当前窗口数: " << wndnum << endl;//调试用
+	cout << "当前窗口数: " << wndnum << endl;//调试用
 
 	if (pHeader == nullptr || wndnum == 0) return;
 
@@ -604,27 +606,23 @@ VOID VTWPARAMS::DisplayWindowFrame()
 	WNDPARAMS* pBuffer = pHeader;
 	while (pBuffer != nullptr)
 	{
-		if (pBuffer->hwnd) {
+		if (pBuffer->hwnd) 
+		{
 			hdwp = DeferWindowPos(hdwp, pBuffer->hwnd, HWND_TOP,
 				pBuffer->x, pBuffer->y,
 				pBuffer->width, pBuffer->height,
 				SWP_NOCOPYBITS | SWP_SHOWWINDOW);
+			InvalidateRect(pBuffer->hwnd, NULL, TRUE);
 		}
 		pBuffer = pBuffer->next;
 	}
 	// 应用所有移动
 	EndDeferWindowPos(hdwp);
 
-	// 强制重绘每个窗口，确保背景为白色
-	pBuffer = pHeader;
-	while (pBuffer != nullptr)
-	{
-		if (pBuffer->hwnd) {
-			RedrawWindow(pBuffer->hwnd, NULL, NULL,
-				RDW_ERASE | RDW_INVALIDATE | RDW_UPDATENOW);
-		}
-		pBuffer = pBuffer->next;
-	}
+	RECT videoRect = { startx, starty, startx + Width, starty + Height };
+	RedrawWindow(NULL, &videoRect, NULL, 
+		RDW_ERASE | RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+
 	if (a.hStartEvent && !a.bStartEventTriggered) 
 	{
 		SetEvent(a.hStartEvent);
@@ -635,33 +633,67 @@ VOID VTWPARAMS::DisplayWindowFrame()
 
 VOID VTWPARAMS::CreateNewWindow(int x, int y, int width, int height)
 {
-    if (pHeader == nullptr) 
+	if (WindowsPool.empty())
 	{
-        pHeader = new WNDPARAMS();
-        pHeader->next = nullptr;
-        pHeader->x = x; pHeader->y = y; pHeader->width = width; pHeader->height = height;
-        pHeader->hwnd = CreateWindowA("VTW", szFileName, WS_POPUP, x, y, width, height, NULL, NULL, g_hInstance, NULL);
-		if (pHeader->hwnd)
+		if (pHeader == nullptr)
 		{
-			ShowWindow(pHeader->hwnd, SW_SHOWNOACTIVATE);
-			UpdateWindow(pHeader->hwnd);
+			pHeader = new WNDPARAMS();
+			pHeader->next = nullptr;
+			pHeader->x = x; pHeader->y = y; pHeader->width = width; pHeader->height = height;
+			pHeader->hwnd = CreateWindowA("VTW", szFileName, WS_POPUP, x, y, width, height, NULL, NULL, g_hInstance, NULL);
+			if (pHeader->hwnd)
+			{
+				ShowWindow(pHeader->hwnd, SW_SHOWNOACTIVATE);
+				UpdateWindow(pHeader->hwnd);
+			}
+			wndnum = 1;
+			return;
 		}
-        wndnum = 1;
-        return;
-    }
-    WNDPARAMS* pBuffer = pHeader;
-    while (pBuffer->next != nullptr) pBuffer = pBuffer->next;
-    pBuffer->next = new WNDPARAMS();
-    pBuffer = pBuffer->next;
-    pBuffer->next = nullptr;
-    pBuffer->x = x; pBuffer->y = y; pBuffer->width = width; pBuffer->height = height;
-    pBuffer->hwnd = CreateWindowA("VTW", szFileName, WS_POPUP, x, y, width, height, NULL, NULL, g_hInstance, NULL);
-    if (pBuffer->hwnd) 
+		WNDPARAMS* pBuffer = pHeader;
+		while (pBuffer->next != nullptr) pBuffer = pBuffer->next;
+		pBuffer->next = new WNDPARAMS();
+		pBuffer = pBuffer->next;
+		pBuffer->next = nullptr;
+		pBuffer->x = x; pBuffer->y = y; pBuffer->width = width; pBuffer->height = height;
+		pBuffer->hwnd = CreateWindowA("VTW", szFileName, WS_POPUP, x, y, width, height, NULL, NULL, g_hInstance, NULL);
+		if (pBuffer->hwnd)
+		{
+			ShowWindow(pBuffer->hwnd, SW_SHOWNOACTIVATE);
+			UpdateWindow(pBuffer->hwnd);
+		}
+		++wndnum;
+	}
+	else
 	{
-		ShowWindow(pBuffer->hwnd, SW_SHOWNOACTIVATE);
-		UpdateWindow(pBuffer->hwnd);
-    }
-    ++wndnum;
+		if (pHeader == nullptr)
+		{
+			pHeader = WindowsPool.back();
+			WindowsPool.pop_back();
+			pHeader->next = nullptr;
+			pHeader->x = x; pHeader->y = y; pHeader->width = width; pHeader->height = height;
+			if (pHeader->hwnd)
+			{
+				ShowWindow(pHeader->hwnd, SW_SHOWNOACTIVATE);
+				UpdateWindow(pHeader->hwnd);
+			}
+			wndnum = 1;
+			return;
+		}
+		WNDPARAMS* pBuffer = pHeader;
+		while (pBuffer->next != nullptr) 
+			pBuffer = pBuffer->next;
+		pBuffer->next = WindowsPool.back();
+		WindowsPool.pop_back();
+		pBuffer = pBuffer->next;
+		pBuffer->next = nullptr;
+		pBuffer->x = x; pBuffer->y = y; pBuffer->width = width; pBuffer->height = height;
+		if (pBuffer->hwnd)
+		{
+			ShowWindow(pBuffer->hwnd, SW_SHOWNOACTIVATE);
+			UpdateWindow(pBuffer->hwnd);
+		}
+		++wndnum;
+	}
 }
 
 VOID VTWPARAMS::DeleteNumberOfEndWindow(int number)
@@ -669,13 +701,17 @@ VOID VTWPARAMS::DeleteNumberOfEndWindow(int number)
 	if (number <= 0 || pHeader == nullptr || wndnum <= 0) return;
 
 	// 若删除数量 >= 当前数量，则删除全部并重置头
-	if (number >= wndnum) {
+	if (number >= wndnum)
+	{
 		WNDPARAMS* cur = pHeader;
 		while (cur) 
 		{
 			WNDPARAMS* next = cur->next;
-			if (cur->hwnd) DestroyWindow(cur->hwnd);
-			delete cur;
+			if (cur->hwnd)
+			{
+				ShowWindow(cur->hwnd, SW_HIDE);
+				WindowsPool.push_back(cur);
+			}
 			cur = next;
 		}
 		pHeader = nullptr;
@@ -686,16 +722,19 @@ VOID VTWPARAMS::DeleteNumberOfEndWindow(int number)
 	// 找到保留链表的最后一个节点（新的尾）
 	int keep = wndnum - number;
 	WNDPARAMS* prev = pHeader;
-	for (int i = 1; i < keep; ++i) {
+	for (int i = 1; i < keep; ++i)
 		if (prev->next) prev = prev->next;
-	}
 
-	// 删除 prev->next 之后的所有节点
+	// 将 prev->next 之后的所有节点存入窗口池
 	WNDPARAMS* cur = prev->next;
-	while (cur) {
+	while (cur) 
+	{
 		WNDPARAMS* next = cur->next;
-		if (cur->hwnd) DestroyWindow(cur->hwnd);
-		delete cur;
+		if (cur->hwnd)
+		{
+			ShowWindow(cur->hwnd, SW_HIDE);
+			WindowsPool.push_back(cur);
+		}
 		cur = next;
 	}
 
@@ -908,7 +947,7 @@ VOID VTWPARAMS::ComputeWindow_EXTEND_METHOD()
 			int rectW = rx - x + 1;
 			int rectH = by - y + 1;
 			//确定当前矩形是否满足最小尺寸要求
-			if (rectW >= RectMinSize && rectH >= RectMinSize)
+			if (max(rectW,rectH) >= RectMinSizeLong && min(rectW,rectH) >= RectMinSizeShort)
 			{
 				RectToWindow(x + startx, y + starty, rectW, rectH);
 			}
