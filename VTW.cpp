@@ -3,166 +3,198 @@
 
 HINSTANCE g_hInstance;
 
-int main()
+int main() 
 {
 	g_hInstance = GetModuleHandle(nullptr);
 
-	CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    CoInitializeEx(NULL, COINIT_MULTITHREADED);
 
-	CHAR szInputBuffer[1024] = { 0 };
-	CHAR* token1 = nullptr;
-	CHAR* token2 = nullptr;
-	CHAR* next_token = nullptr;
+	string inputLine;
 	while (TRUE)
 	{
 		VTWPARAMS v;
 	start:
 
+		// 视频路径
 		cout << "视频路径（绝对路径且不含中文）：";
-		cin.getline(szInputBuffer, sizeof(szInputBuffer));
-		v.SetVideoPath(szInputBuffer);
-
-		ZeroMemory(szInputBuffer, sizeof(szInputBuffer));
-		cout << endl;
-		cout << "窗口替代颜色（“w”白，“b”黑）:";
-		cin >> szInputBuffer;
-		if (strcmp(szInputBuffer, "w") == 0)
+		if (!std::getline(cin, inputLine)) inputLine.clear();
+		while (inputLine.empty())
 		{
-			v.SetInsteadColor(WHITE);
+			cout << "路径不能为空，请重新输入：";
+			if (!std::getline(cin, inputLine)) inputLine.clear();
 		}
-		else if(strcmp(szInputBuffer, "b") == 0)
-		{
+		v.SetVideoPath(const_cast<LPSTR>(inputLine.c_str()));
+
+		// 窗口替代颜色
+		cout << "窗口替代颜色（\"w\"白，\"b\"黑）:";
+		if (!std::getline(cin, inputLine)) inputLine.clear();
+		if (!inputLine.empty() && (inputLine[0] == 'b' || inputLine[0] == 'B'))
 			v.SetInsteadColor(BLACK);
-		}
 		else
-		{
-			cout << "输入错误，默认使用白色范围" << endl;
 			v.SetInsteadColor(WHITE);
-		}
-		
-WhiteRangeInput:		
-		ZeroMemory(szInputBuffer, sizeof(szInputBuffer));
-		cout << endl;
-		cout << "白色范围（输入格式：最小值 最大值）：";
-		cin.clear(); // 清除错误标志
-		cin.ignore(10000, '\n');
-		cin.getline(szInputBuffer, sizeof(szInputBuffer));
-		token1 = strtok_s(szInputBuffer, " ", &next_token);
-		token2 = strtok_s(nullptr, " ", &next_token);
 
-		if (token1 && token2)
+		// 白色范围
+		while (true)
 		{
-			int minVal = atoi(token1);
-			int maxVal = atoi(token2);
-			v.SetWhiteRanges(minVal, maxVal);
-		}
-		else
-		{
-			cout << "输入错误，输入y以重新输入，输入n以默认值225 255运行" << endl;
-			ZeroMemory(szInputBuffer, sizeof(szInputBuffer));
-			cin >> szInputBuffer;
-			if (strcmp(szInputBuffer, "y") == 0)
+			cout << "白色范围（输入格式：最小值 最大值）（回车使用默认值 225 255）：";
+			if (!std::getline(cin, inputLine)) inputLine.clear();
+			if (inputLine.empty())
 			{
-				goto WhiteRangeInput;
+				v.SetWhiteRanges(225, 255);
+				break;
 			}
-		}
-
-BlackRangeInput:	
-		ZeroMemory(szInputBuffer, sizeof(szInputBuffer));
-		next_token = nullptr;
-		cout << endl;
-		cout << "黑色范围（输入格式：最小值 最大值）：";
-		cin.clear();
-		cin.getline(szInputBuffer, sizeof(szInputBuffer));
-		token1 = strtok_s(szInputBuffer, " ", &next_token);
-		token2 = strtok_s(nullptr, " ", &next_token);
-
-		if (token1 && token2)
-		{
-			int minVal = atoi(token1);
-			int maxVal = atoi(token2);
-			v.SetBlackRanges(minVal, maxVal);
-		}
-		else
-		{
-			cout << "输入错误，输入y以重新输入，输入n以默认值16 36运行" << endl;
-			ZeroMemory(szInputBuffer, sizeof(szInputBuffer));
-			cin >> szInputBuffer;
-			if (strcmp(szInputBuffer, "y") == 0)
+			std::istringstream iss(inputLine);
+			int minVal, maxVal;
+			if (iss >> minVal >> maxVal)
 			{
-				goto BlackRangeInput;
+				v.SetWhiteRanges(minVal, maxVal);
+				break;
 			}
+			cout << "输入错误，输入 y 以重新输入，输入 n 以使用默认值 225 255：";
+			if (!std::getline(cin, inputLine)) inputLine.clear();
+			if (!inputLine.empty() && (inputLine[0] == 'y' || inputLine[0] == 'Y')) continue;
+			v.SetWhiteRanges(225, 255);
+			break;
 		}
-		
-SizeInput:	
-		ZeroMemory(szInputBuffer, sizeof(szInputBuffer));
-		next_token = nullptr;
-		cout << endl;
-		cout << "宽度与高度（输入格式：宽度 高度）：";
-		cin.clear();
-		cin.getline(szInputBuffer, sizeof(szInputBuffer));
 
-		token1 = strtok_s(szInputBuffer, " ", &next_token);
-		token2 = strtok_s(nullptr, " ", &next_token);
-
-		if (token1 && token2)
+		// 黑色范围
+		while (true)
 		{
-			int width = atoi(token1);
-			int height = atoi(token2);
-			v.SetDisplaySize(width, height);
-		}
-		else
-		{
-			cout << "输入错误，输入y以重新输入，输入n以全屏运行" << endl;
-			ZeroMemory(szInputBuffer, sizeof(szInputBuffer));
-			cin >> szInputBuffer;
-			if (strcmp(szInputBuffer, "y") == 0)
+			cout << "黑色范围（输入格式：最小值 最大值）（回车使用默认值 16 36）：";
+			if (!std::getline(cin, inputLine)) inputLine.clear();
+			if (inputLine.empty())
 			{
-				goto SizeInput;
+				v.SetBlackRanges(16, 36);
+				break;
 			}
+			std::istringstream iss(inputLine);
+			int minVal, maxVal;
+			if (iss >> minVal >> maxVal)
+			{
+				v.SetBlackRanges(minVal, maxVal);
+				break;
+			}
+			cout << "输入错误，输入 y 以重新输入，输入 n 以使用默认值 16 36：";
+			if (!std::getline(cin, inputLine)) inputLine.clear();
+			if (!inputLine.empty() && (inputLine[0] == 'y' || inputLine[0] == 'Y')) continue;
+			v.SetBlackRanges(16, 36);
+			break;
 		}
 
-
-		ZeroMemory(szInputBuffer, sizeof(szInputBuffer));
-		cout << endl;
-		cout << "最小矩形尺寸（输入0则为默认）：";
-		cin >> szInputBuffer;
+		// 宽度与高度
+		while (true)
 		{
-			int val = atoi(szInputBuffer);
-			if (val <= 0)
+			cout << "宽度与高度（输入格式：宽度 高度）（回车使用屏幕分辨率）：";
+			if (!std::getline(cin, inputLine)) inputLine.clear();
+			if (inputLine.empty())
 			{
-				// 恢复为构造函数中的默认比例，避免设得过大
-				v.SetRectMinSize((v.GetWidth() + v.GetHeight()) / 200);
+				v.SetDisplaySize(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+				break;
+			}
+			std::istringstream iss(inputLine);
+			int width, height;
+			if (iss >> width >> height && width > 0 && height > 0)
+			{
+				v.SetDisplaySize(width, height);
+				break;
+			}
+			cout << "输入错误，输入 y 以重新输入，输入 n 以全屏运行：";
+			if (!std::getline(cin, inputLine)) inputLine.clear();
+			if (!inputLine.empty() && (inputLine[0] == 'y' || inputLine[0] == 'Y')) continue;
+			v.SetDisplaySize(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+			break;
+		}
+
+		// 是否启用缩放
+		while (true)
+		{
+			cout << "是否启用缩放（改善性能，但损失画面）（\"y\"是，\"n\"否）（默认关闭）:";
+			if (!std::getline(cin, inputLine)) inputLine.clear();
+
+			if (inputLine.empty())
+			{
+				v.SetUsedResize(FALSE);
+				break;
+			}
+
+			char c = inputLine[0];
+			if (c == 'y' || c == 'Y')
+			{
+				// 启用缩放，询问目标宽高（回车使用屏幕分辨率）
+				cout << "缩放后宽度 与 高度（输入格式：宽度 高度）（回车使用屏幕分辨率）:";
+				if (!std::getline(cin, inputLine)) inputLine.clear();
+
+				if (inputLine.empty())
+				{
+					v.SetDisplaySize(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+				}
+				else
+				{
+					std::istringstream iss2(inputLine);
+					int w, h;
+					if (iss2 >> w >> h && w > 0 && h > 0)
+					{
+						v.SetResizeSize(w, h);
+					}
+					else
+					{
+						// 输入错误，使用屏幕分辨率作为回退
+						cout << "输入错误，请重新输入" << endl;
+						continue;
+					}
+				}
+				v.SetUsedResize(TRUE);
+				break;
+			}
+			else if (c == 'n' || c == 'N')
+			{
+				v.SetUsedResize(FALSE);
+				// 保持已设置的显示尺寸或默认值
+				break;
 			}
 			else
 			{
-				v.SetRectMinSize(val);
+				cout << "输入错误，请输入 y 或 n。" << endl;
+				continue;
 			}
 		}
 
-		ZeroMemory(szInputBuffer, sizeof(szInputBuffer));
-		cout << endl;
-		cout << "窗口计算算法（输入0为默认，即扩展法）："<<endl;
-		cout << "100.扩展法（贡献者Longn1ght）"<<endl;
-		cout << "101.占位符（别打，保留，打了没用）"<<endl;
-		cin >> szInputBuffer;
+		// 最小矩形尺寸
+		cout << "最小矩形尺寸（输入0则为默认）：";
+		if (!std::getline(cin, inputLine)) inputLine.clear();
+		int val = 0;
+		if (!inputLine.empty())
+			val = atoi(inputLine.c_str());
+		if (val <= 0)
 		{
-			int val = atoi(szInputBuffer);
-			
-			switch (val)
-			{
-			case EXTEND_METHOD:
-				v.SetComputeMethod(EXTEND_METHOD);
-				break;
+			v.SetRectMinSize((v.GetWidth() + v.GetHeight()) / 200);
+		}
+		else
+		{
+			v.SetRectMinSize(val);
+		}
 
-			case 101:
-				// 占位符算法，暂未实现
-				cout << "占位符算法尚未实现，默认使用扩展法" << endl;
-
-			case 0:
-				v.SetComputeMethod(EXTEND_METHOD);
-				break;
-			}
+		// 窗口计算算法
+		cout << endl;
+		cout << "窗口计算算法（输入0为默认，即扩展法）：" << endl;
+		cout << "100.扩展法（贡献者Longn1ght）" << endl;
+		cout << "101.贪心算法？" << endl;
+		cout << "请输入算法编号（回车默认 100）：";
+		if (!std::getline(cin, inputLine)) inputLine.clear();
+		int methodVal = 0;
+		if (!inputLine.empty()) methodVal = atoi(inputLine.c_str());
+		switch (methodVal)
+		{
+		case EXTEND_METHOD:
+			v.SetComputeMethod(EXTEND_METHOD);
+			break;
+		case GREEDY_METHOD:
+			v.SetComputeMethod(GREEDY_METHOD);
+			break;
+		case 0:
+		default:
+			v.SetComputeMethod(EXTEND_METHOD);
+			break;
 		}
 
 		if (!v.AutoUpdate())
@@ -199,9 +231,9 @@ SizeInput:
 			v.DisplayWindowFrame();
 		}
 
-		cout << "是否播放其他视频（y/n）：";
-		cin >> szInputBuffer;
-		if (strcmp(szInputBuffer, "y") == 0)
+        cout << "是否播放其他视频（y/n）：";
+		if (!std::getline(cin, inputLine)) inputLine.clear();
+		if (!inputLine.empty() && (inputLine[0] == 'y' || inputLine[0] == 'Y'))
 		{
 			continue;
 		}
@@ -349,6 +381,19 @@ VOID VTWPARAMS::SetInsteadColor(BOOL bBlack)
 	return;
 }
 
+VOID VTWPARAMS::SetUsedResize(BOOL bUsed)
+{
+	bUsedResize = bUsed;
+	return;
+}
+
+VOID VTWPARAMS::SetResizeSize(int rwidth, int rheight)
+{
+	ResizeWidth = rwidth;
+	ResizeHeight = rheight;
+	return;
+}
+
 VOID VTWPARAMS::SetDisplaySize(int width, int height)
 {
 	Width = width;
@@ -431,15 +476,36 @@ BOOL VTWPARAMS::AutoUpdate()
 			return FALSE;
 	}
 	//视频重采样
-    v.SwsCtx = sws_getContext(v.codecCtx->width, v.codecCtx->height, v.codecCtx->pix_fmt,
-		Width, Height, AV_PIX_FMT_YUV444P, SWS_POINT, NULL,
-		NULL, NULL);
-	v.data.resize(Width * Height);
-	v.processed.resize(Width * Height, false);//见VTW.h中processed的定义
-	size_t planeSize = static_cast<size_t>(Width) * static_cast<size_t>(Height);
-	v.planeY.resize(planeSize);
-	v.planeU.resize(planeSize);
-	v.planeV.resize(planeSize);
+	if (bUsedResize)
+	{
+		v.SwsCtx = sws_getContext(v.codecCtx->width, v.codecCtx->height, v.codecCtx->pix_fmt,
+			ResizeWidth, ResizeHeight, AV_PIX_FMT_YUV444P, SWS_AREA, NULL,
+			NULL, NULL);
+		v.data.resize(ResizeWidth * ResizeHeight);
+		v.processed.resize(ResizeWidth * ResizeHeight, false);//见VTW.h中processed的定义
+		v.planeSize = static_cast<size_t>(ResizeWidth) * static_cast<size_t>(ResizeHeight);
+		v.planeY.resize(v.planeSize);
+		v.planeU.resize(v.planeSize);
+		v.planeV.resize(v.planeSize);
+        // 不要将 ResizeTemp 大量 resize（会创建大量默认元素并在后续帧中累积），改为清空并可选预留
+		v.ResizeTemp.clear();
+		v.ResizeTemp.reserve((size_t)max(1024, (ResizeWidth * ResizeHeight) / 100));
+		// ResizeRatio 表示从缩放后坐标映射到显示坐标的乘数（display = resized * ResizeRatio）
+		ResizeRatioX = static_cast<float>(Width) / static_cast<float>(ResizeWidth);
+		ResizeRatioY = static_cast<float>(Height) / static_cast<float>(ResizeHeight);
+	}
+	else
+	{
+		v.SwsCtx = sws_getContext(v.codecCtx->width, v.codecCtx->height, v.codecCtx->pix_fmt,
+			Width, Height, AV_PIX_FMT_YUV444P, SWS_POINT, NULL,
+			NULL, NULL);
+		v.data.resize(Width * Height);
+		v.processed.resize(Width * Height, false);//见VTW.h中processed的定义
+		v.planeSize = static_cast<size_t>(Width) * static_cast<size_t>(Height);
+		v.planeY.resize(v.planeSize);
+		v.planeU.resize(v.planeSize);
+		v.planeV.resize(v.planeSize);
+	}
 
 	//音频重采样及XAudio2初始化
 	swr_alloc_set_opts2(&a.SwrCtx,&a.codecCtx->ch_layout, AV_SAMPLE_FMT_S16,
@@ -519,7 +585,8 @@ BOOL VTWPARAMS::ComputeWindow()
 {
 	curWndIndex = 0;
 
-    size_t planeSize = static_cast<size_t>(Width) * static_cast<size_t>(Height);
+    // 清空 ResizeTemp（每帧应重建缩放后矩形列表，防止帧间残留）
+	v.ResizeTemp.clear();
 
     // 设置目标指针
     uint8_t* temp[AV_NUM_DATA_POINTERS] = 
@@ -530,7 +597,10 @@ BOOL VTWPARAMS::ComputeWindow()
         nullptr, nullptr, nullptr, nullptr, nullptr
     };
     int linesize[AV_NUM_DATA_POINTERS] = { 0 };
-    av_image_fill_linesizes(linesize, AV_PIX_FMT_YUV444P, Width);
+	if (bUsedResize)
+		av_image_fill_linesizes(linesize, AV_PIX_FMT_YUV444P, ResizeWidth);
+	else
+	    av_image_fill_linesizes(linesize, AV_PIX_FMT_YUV444P, Width);
 
     // 转换图像格式
     int ret = sws_scale(v.SwsCtx, v.frame->data, v.frame->linesize, 0, v.codecCtx->height, temp, linesize);
@@ -540,11 +610,11 @@ BOOL VTWPARAMS::ComputeWindow()
     }
 
     // 填充 data（确保不会越界）
-    for (size_t i = 0, n = planeSize; i < n; ++i) 
+    for (size_t i = 0, n = v.planeSize; i < n; ++i) 
 	{
         v.data[i].y = v.planeY[i];
-        v.data[i].u = v.planeU[i];
-        v.data[i].v = v.planeV[i];
+        //v.data[i].u = v.planeU[i];
+        //v.data[i].v = v.planeV[i];
     }
 
 	switch (ComputeMethod)
@@ -553,9 +623,18 @@ BOOL VTWPARAMS::ComputeWindow()
 		ComputeWindow_EXTEND_METHOD();
 		break;
 
+    case COMPUTE_WINDOW_METHOD::GREEDY_METHOD:
+		ComputeWindow_GREEDY_METHOD();
+		break;
 	}
-    RectToWindow(-1, -1, -1, -1);
-    return TRUE;
+
+	if (bUsedResize)
+		R_RectToWindow();
+	else
+		RectToWindow(-1, -1, -1, -1);
+
+	return TRUE;
+
 }
 
 VOID VTWPARAMS::RectToWindow(int x, int y, int width, int height)
@@ -574,12 +653,13 @@ VOID VTWPARAMS::RectToWindow(int x, int y, int width, int height)
 	// 处理新矩形
 	if (curWndIndex < wndnum)
 	{
-		// 复用第 curWndIndex 个窗口（0-based）
+		// 复用第 curWndIndex 个窗口
 		WNDPARAMS* p = pHeader;
-		for (int j = 0; j < curWndIndex; ++j) {
-			if (p) p = p->next;
-		}
-		if (p) {
+		for (int j = 0; j < curWndIndex; ++j)
+			if (p)
+				p = p->next;
+		if (p)
+		{
 			p->x = x;
 			p->y = y;
 			p->width = width;
@@ -595,9 +675,23 @@ VOID VTWPARAMS::RectToWindow(int x, int y, int width, int height)
 	++curWndIndex;
 }
 
+VOID VTWPARAMS::R_RectToWindow()
+{
+	int x, y, width, height;
+	for (size_t i = 0; i < v.ResizeTemp.size(); ++i)
+	{
+		x = v.ResizeTemp[i].left * ResizeRatioX;
+		y = v.ResizeTemp[i].top * ResizeRatioY;
+		width = (v.ResizeTemp[i].right - v.ResizeTemp[i].left) * ResizeRatioX;
+		height = (v.ResizeTemp[i].bottom - v.ResizeTemp[i].top) * ResizeRatioY;
+		RectToWindow(startx+x, starty+y, width, height);
+	}
+	RectToWindow(-1, -1, -1, -1);
+}
+
 VOID VTWPARAMS::DisplayWindowFrame()
 {
-	cout << "当前窗口数: " << wndnum << endl;//调试用
+	//cout << "当前窗口数: " << wndnum << endl;//调试用
 
 	if (pHeader == nullptr || wndnum == 0) return;
 
@@ -861,8 +955,12 @@ DWORD WINAPI VTWPARAMS::AudioThread(LPVOID lpParam)
 // 其他大部分在没有注释的情况下阅读起来难度不大，因此简略注释或不注释它处
 VOID VTWPARAMS::ComputeWindow_EXTEND_METHOD()
 {
-	// 重置标记数组
+    // 重置标记数组
 	fill(v.processed.begin(), v.processed.end(), false);
+
+	// 根据是否启用缩放选择处理的目标尺寸（缩放后尺寸或显示尺寸）
+	int targetW = bUsedResize ? ResizeWidth : Width;
+	int targetH = bUsedResize ? ResizeHeight : Height;
 
 	/*——————各变量含义——————*/
 	//x,y分别指当前的列与行，也就是这个点的坐标
@@ -879,12 +977,12 @@ VOID VTWPARAMS::ComputeWindow_EXTEND_METHOD()
 	//rowOK是一个布尔值，在向下扩展时用于判断当前行是否完全满足颜色条件，
 	//如果有任意一个点不满足，就不继续向下扩展了
 	//rectW和rectH分别是当前矩形的宽度和高度，通过计算扩展后的坐标差得到
-	for (int y = 0; y < Height; ++y)
+    for (int y = 0; y < targetH; ++y)
 	{
-		int rowOffBase = y * Width;	
-		for (int x = 0; x < Width; ++x)
+		int rowOffBase = y * targetW;    
+		for (int x = 0; x < targetW; ++x)
 		{
-			size_t off = static_cast<size_t>(rowOffBase + x);
+            size_t off = static_cast<size_t>(rowOffBase + x);
 			if (v.processed[off]) continue;
 
 			uint8_t val = v.data[off].y;
@@ -893,9 +991,9 @@ VOID VTWPARAMS::ComputeWindow_EXTEND_METHOD()
 
 			// 从 (x, y) 向右扩展，找到连续匹配的最大 rx
 			int rx = x;//先令rx为x，再进行下一步计算
-			while (rx + 1 < Width)//在0至Width-1的范围内扩展，直到遇到不满足条件的点或者越界
+            while (rx + 1 < targetW)//在0至targetW-1的范围内扩展，直到遇到不满足条件的点或者越界
 			{
-				size_t noff = static_cast<size_t>(rowOffBase + rx + 1);
+                size_t noff = static_cast<size_t>(rowOffBase + rx + 1);
 				if (v.processed[noff]) 
 					break;
 				uint8_t mval = v.data[noff].y;
@@ -907,10 +1005,10 @@ VOID VTWPARAMS::ComputeWindow_EXTEND_METHOD()
 
 			// 从 (x, y) 向下扩展，找到连续匹配的最大 by
 			int by = y;
-			while (by + 1 < Height)
+            while (by + 1 < targetH)
 			{
 				bool rowOK = true;// 先假设当前行完全匹配，后续检查如果发现有不匹配的点就置为false
-				int nextRowOff = (by + 1) * Width;
+                int nextRowOff = (by + 1) * targetW;
 				for (int xx = x; xx <= rx; ++xx)
 				{
 					size_t noff = static_cast<size_t>(nextRowOff + xx);
@@ -934,9 +1032,9 @@ VOID VTWPARAMS::ComputeWindow_EXTEND_METHOD()
 			}
 
 			// 标记矩形区域为已处理
-			for (int yy = y; yy <= by; ++yy)
+            for (int yy = y; yy <= by; ++yy)
 			{
-				int rowOff = yy * Width;
+				int rowOff = yy * targetW;
 				for (int xx = x; xx <= rx; ++xx)
 				{
 					v.processed[static_cast<size_t>(rowOff + xx)] = true;
@@ -946,13 +1044,140 @@ VOID VTWPARAMS::ComputeWindow_EXTEND_METHOD()
 			//计算当前矩形的宽高（注意这里是坐标差+1，因为坐标是从0开始的）
 			int rectW = rx - x + 1;
 			int rectH = by - y + 1;
-			//确定当前矩形是否满足最小尺寸要求
-			if (max(rectW,rectH) >= RectMinSizeLong && min(rectW,rectH) >= RectMinSizeShort)
-			{
-				RectToWindow(x + startx, y + starty, rectW, rectH);
-			}
+			//是否启用缩放
+			if (bUsedResize)
+				//确定当前矩形是否满足最小尺寸要求
+				if (max(rectW, rectH) >= RectMinSizeLong/ResizeRatioX && min(rectW, rectH) >= RectMinSizeShort/ResizeRatioY)
+					v.ResizeTemp.push_back({ x, y, x + rectW, y + rectH }); //把当前矩形的坐标和尺寸存入ResizeTemp，等会再次进行放大缩放
+			else
+				if (max(rectW,rectH) >= RectMinSizeLong && min(rectW,rectH) >= RectMinSizeShort)
+					RectToWindow(x + startx, y + starty, rectW, rectH);
 
 			x = rx;	// 跳过已处理的部分
 		}
+	}
+}
+
+// 贪心算法,灵感来源：https://github.com/mon/bad_apple_virus
+VOID VTWPARAMS::ComputeWindow_GREEDY_METHOD()
+{
+    // 类似 Python 版：重复寻找当前帧中面积最大的连续匹配矩形，标记访问并记录
+	int targetW = bUsedResize ? ResizeWidth : Width;
+	int targetH = bUsedResize ? ResizeHeight : Height;
+	size_t planeSize = static_cast<size_t>(targetW) * static_cast<size_t>(targetH);
+
+	// 使用一个简单的访问标记数组（0 表示未访问，1 表示已访问或不匹配）
+	vector<char> visited(planeSize, 0);
+
+    // 不使用 v.Mergetemp；直接把贪心找到的矩形传给 RectToWindow
+
+	while (true)
+	{
+		bool foundAny = false;
+		int bestArea = 0;
+		int bestX = 0, bestY = 0, bestW = 0, bestH = 0;
+
+		// 在所有像素点尝试以该点为左上角的最大矩形
+        for (int y = 0; y < targetH; ++y)
+		{
+            int rowOffBase = y * targetW;
+			for (int x = 0; x < targetW; ++x)
+			{
+                size_t off = static_cast<size_t>(rowOffBase + x);
+				if (visited[off]) continue;
+
+				uint8_t val = v.data[off].y;
+				bool match = !bInsteadColor ? (val >= MinWhite && val <= MaxWhite) : (val >= MinBlack && val <= MaxBlack);
+				if (!match)
+				{
+					// 非目标像素，标记为已访问以加速后续搜索
+					visited[off] = 1;
+					continue;
+				}
+
+				// 以 (x,y) 为左上角，向下逐行扩展，维护当前行的最小可用宽度 widest
+                int widest = targetW - x;
+				int bestLocalW = 0, bestLocalH = 0;
+
+                for (int h = 0; h < targetH - y; ++h)
+				{
+                    int curRow = y + h;
+					int curW = 0;
+					int curRowOff = curRow * targetW + x;
+
+					// 计算当前行从 x 开始连续匹配的宽度（不超过 widest）
+					for (int wx = 0; wx < widest; ++wx)
+					{
+						size_t noff = static_cast<size_t>(curRowOff + wx);
+						if (visited[noff])
+						{
+							break;
+						}
+						uint8_t nval = v.data[noff].y;
+						bool nmatch = !bInsteadColor ? (nval >= MinWhite && nval <= MaxWhite) : (nval >= MinBlack && nval <= MaxBlack);
+						if (!nmatch) break;
+						++curW;
+					}
+
+					if (curW == 0) break; // 当前行无法延展
+
+					if (curW < widest) widest = curW;
+
+					int area = widest * (h + 1);
+					if (area > bestLocalW * bestLocalH)
+					{
+						bestLocalW = widest;
+						bestLocalH = h + 1;
+					}
+				}
+
+				if (bestLocalW > 0 && bestLocalH > 0)
+				{
+					int area = bestLocalW * bestLocalH;
+					if (area > bestArea)
+					{
+						bestArea = area;
+						bestX = x;
+						bestY = y;
+						bestW = bestLocalW;
+						bestH = bestLocalH;
+						foundAny = true;
+					}
+				}
+			}
+		}
+
+		if (!foundAny || bestArea == 0)
+			break;
+
+        // 标记该最大矩形区域为已访问
+		for (int yy = bestY; yy < bestY + bestH; ++yy)
+		{
+			int rowOff = yy * targetW;
+			for (int xx = bestX; xx < bestX + bestW; ++xx)
+			{
+				visited[static_cast<size_t>(rowOff + xx)] = 1;
+			}
+		}
+
+        // 标记 v.processed 并按最小尺寸条件输出窗口
+		for (int yy = bestY; yy < bestY + bestH; ++yy)
+		{
+			int rowOff = yy * targetW; // 使用 targetW，保持与 visited/v.data 的分配一致
+			for (int xx = bestX; xx < bestX + bestW; ++xx)
+			{
+				size_t idx = static_cast<size_t>(rowOff + xx);
+				visited[idx] = 1;
+				v.processed[idx] = true;
+			}
+		}
+		if (bUsedResize)
+			if (max(bestW, bestH) >= RectMinSizeLong/ResizeRatioX && min(bestW, bestH) >= RectMinSizeShort/ResizeRatioY)
+				v.ResizeTemp.push_back({ bestX, bestY, bestX + bestW, bestY + bestH });
+		// 仅当满足最小尺寸要求时创建窗口，与扩展法保持一致
+		else
+			if (max(bestW, bestH) >= RectMinSizeLong && min(bestW, bestH) >= RectMinSizeShort)
+				RectToWindow(bestX + startx, bestY + starty, bestW, bestH);
+		
 	}
 }

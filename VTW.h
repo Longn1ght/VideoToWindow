@@ -1,7 +1,10 @@
 #pragma once
 #include <algorithm>
 #include <iostream>
+#include <string>
+#include <sstream>
 #include <strsafe.h>
+#include <cmath>
 #include <TCHAR.h>
 #include <vector>
 #include <Windows.h>
@@ -50,7 +53,6 @@ struct YUV
 	uint8_t y;
 	uint8_t u;
 	uint8_t v;
-
 };
 
 class VTWPARAMS;
@@ -59,7 +61,6 @@ class VoiceCallback;
 //视频相关参数结构体
 struct VIDEOPARAMS
 {
-
 	AVFormatContext* fmtCtx;
 	AVCodecContext* codecCtx;
 	int VideoStreamIndex;
@@ -74,6 +75,8 @@ struct VIDEOPARAMS
 	vector<uint8_t> planeY;
 	vector<uint8_t> planeU;
 	vector<uint8_t> planeV;
+	size_t planeSize;
+	vector<RECT>ResizeTemp;//缩放后窗口的临时矩形，避免在循环中频繁创建RECT对象
 };
 
 //音频相关参数结构体
@@ -107,6 +110,7 @@ struct AUDIOPARAMS
 enum COMPUTE_WINDOW_METHOD
 {
 	EXTEND_METHOD = 100,
+	GREEDY_METHOD = 101,
 };
 
 
@@ -126,8 +130,13 @@ private:
 	int MinBlack;
 	int MaxBlack;
 	BOOL bInsteadColor;
+	BOOL bUsedResize;//是否使用缩放
+	int ResizeWidth;
+	int ResizeHeight;
 	int Width;
 	int Height;
+	float ResizeRatioX;
+	float ResizeRatioY;
 	int RectMinSizeLong;
 	float RectMinSizeShort;
 	RECT rect;
@@ -151,6 +160,8 @@ public:
 	VOID SetWhiteRanges(int min, int max);
 	VOID SetBlackRanges(int min, int max);
 	VOID SetInsteadColor(BOOL bBlack);
+	VOID SetUsedResize(BOOL bUsed);
+	VOID SetResizeSize(int rwidth, int rheight);
 	VOID SetDisplaySize(int width, int height);
 	int GetWidth();
 	int GetHeight();
@@ -162,6 +173,7 @@ public:
 	BOOL RequestFrame();
 	BOOL ComputeWindow();
 	VOID RectToWindow(int x, int y, int width, int height);
+	VOID R_RectToWindow();
 	VOID DisplayWindowFrame();
 	VOID CreateNewWindow(int x, int y, int width, int height);
 	VOID DeleteNumberOfEndWindow(int number);
@@ -171,6 +183,7 @@ public:
 
 	//算法们
 	VOID ComputeWindow_EXTEND_METHOD();
+	VOID ComputeWindow_GREEDY_METHOD();
 };
 
 // 设置 XAudio2 回调,提醒写入数据至XAudio2缓冲区（需要实现 IXAudio2VoiceCallback 类）
