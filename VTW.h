@@ -5,6 +5,7 @@
 #include <sstream>
 #include <strsafe.h>
 #include <cmath>
+#include <Shlwapi.h>
 #include <TCHAR.h>
 #include <vector>
 #include <Windows.h>
@@ -18,7 +19,7 @@ extern "C"
 #include <libswscale/swscale.h>
 #include <libavutil/avutil.h>
 #include <libavutil/imgutils.h>   
-#include<libswresample/swresample.h>
+#include <libswresample/swresample.h>
 }
 
 #pragma comment(lib,"winmm.lib")
@@ -30,6 +31,7 @@ extern "C"
 #pragma comment(lib, "ole32.lib") 
 #pragma comment(lib, "xaudio2.lib")
 #pragma comment(lib, "swresample.lib")
+#pragma comment(lib, "Shlwapi.lib")
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
@@ -37,6 +39,8 @@ extern "C"
 #define BLACK 1
 
 using namespace std;
+
+extern HINSTANCE g_hInstance;
 
 struct WNDPARAMS
 {
@@ -77,6 +81,7 @@ struct VIDEOPARAMS
 	vector<uint8_t> planeV;
 	size_t planeSize;
 	vector<RECT>ResizeTemp;//缩放后窗口的临时矩形，避免在循环中频繁创建RECT对象
+	double VideoPTS;
 };
 
 //音频相关参数结构体
@@ -99,6 +104,10 @@ struct AUDIOPARAMS
 	CRITICAL_SECTION bufferCS;//关键段，保护缓冲区状态的访问
 	HANDLE hFreeBufferEvent;//空闲缓冲区事件，通知音频线程有空闲缓冲区可以使用
 	XAUDIO2_BUFFER xaBuffer;//避免在循环中分配，直接在结构体中定义一个成员变量
+
+	double AudioClock;//音频时钟
+	CRITICAL_SECTION AudioClockCS;//保护AudioClock的访问
+
 	AVCodecContext* codecCtx;
 	int AudioStreamIndex;
 	AVFrame* frame;
@@ -115,7 +124,7 @@ enum COMPUTE_WINDOW_METHOD
 
 
 //为窗口提供一个窗口过程，凑数
-INT_PTR CALLBACK VTWProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+inline INT_PTR CALLBACK VTWProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
@@ -167,6 +176,11 @@ public:
 	int GetHeight();
 	VOID SetRectMinSize(int size);
 	VOID SetComputeMethod(COMPUTE_WINDOW_METHOD method);
+	double GetAudioClock();//音频时钟
+	double GetVideoPTS();//视频时钟
+	VOID ResetAudioClock();//重置音频时钟
+	VOID ResetVideoPTS();//重置视频时钟
+	double GetVideoFPS();
 
 	BOOL AutoUpdate();
 
