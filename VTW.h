@@ -89,6 +89,7 @@ struct VIDEOPARAMS
 	size_t planeSize;
 	vector<RECT>ResizeTemp;//缩放后窗口的临时矩形，避免在循环中频繁创建RECT对象
 	double VideoPTS;
+	BOOL IsPlayEnded;
 };
 
 //音频相关参数结构体
@@ -128,6 +129,7 @@ enum COMPUTE_WINDOW_METHOD
 {
 	EXTEND_METHOD = 100,
 	GREEDY_METHOD = 101,
+    EXPERIMENTAL_METHOD = 102,
 };
 
 
@@ -201,6 +203,7 @@ public:
 	VOID DisplayWindowFrame();
 	VOID CreateNewWindow(int x, int y, int width, int height);
 	VOID DeleteNumberOfEndWindow(int number);
+	BOOL IsPlayEnded();
 
 	VOID	 ContinuePauseAudioThread(BOOL bAction);
 	VOID StopAudioThread();//因为a是private的，所以需要一个public函数来停止音频线程。
@@ -210,6 +213,7 @@ public:
 	//算法们
 	VOID ComputeWindow_EXTEND_METHOD();
 	VOID ComputeWindow_GREEDY_METHOD();
+    VOID ComputeWindow_EXPERIMENTAL_METHOD();
 };
 
 // 设置 XAudio2 回调,提醒写入数据至XAudio2缓冲区（需要实现 IXAudio2VoiceCallback 类）

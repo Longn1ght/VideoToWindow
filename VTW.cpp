@@ -1,4 +1,7 @@
 ﻿#include "VTW.h"
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 HINSTANCE g_hInstance;
 HANDLE IsPlayingEvent;
 BOOL bRunning;
@@ -192,6 +195,8 @@ INT_PTR VTWControlProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		SendMessage(hComputeMethod, CB_SETITEMDATA, idx, (LPARAM)EXTEND_METHOD);
 		idx = SendMessage(hComputeMethod, CB_ADDSTRING, 0, (LPARAM)TEXT("贪心算法 (101) 灵感来源：https://github.com/mon/bad_apple_virus,由AI转写"));
 		SendMessage(hComputeMethod, CB_SETITEMDATA, idx, (LPARAM)GREEDY_METHOD);
+        idx = SendMessage(hComputeMethod, CB_ADDSTRING, 0, (LPARAM)TEXT("实验算法 (102) 实验性"));
+		SendMessage(hComputeMethod, CB_SETITEMDATA, idx, (LPARAM)EXPERIMENTAL_METHOD);
 		SendMessage(hComputeMethod, CB_SETCURSEL, 0, 0);
 
 		SendMessage(hRangeMin, CB_SETCURSEL, 0, 0);
@@ -259,103 +264,109 @@ INT_PTR VTWControlProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		{
 			if (!StartAndPauseStatus)
 			{
-				if (pPlayer)
+				if (!pPlayer)
 				{
-					pPlayer->StopAudioThread();
-					delete pPlayer;
-					pPlayer = nullptr;
+					pPlayer = new VTWPARAMS();
+
+					// 从控件获取值并设置到 pPlayer（示例）
+					CHAR path[MAX_PATH];
+					GetDlgItemTextA(hwnd, IDE_PATH, path, MAX_PATH);
+					pPlayer->SetVideoPath(path);
+
+					// 替代颜色
+					if (IsDlgButtonChecked(hwnd, IDB_INSTEADCOLORWHITE) == BST_CHECKED)
+						pPlayer->SetInsteadColor(WHITE);
+					else
+						pPlayer->SetInsteadColor(BLACK);
+
+					// 范围
+					if (IsDlgButtonChecked(hwnd, IDB_INSTEADCOLORWHITE) == BST_CHECKED)
+					{
+						GetDlgItemText(hwnd, IDCB_RANGEMIN, buffer, 256);
+						int minWhite = _wtoi(buffer);
+						ZeroMemory(buffer, sizeof(buffer));
+						GetDlgItemText(hwnd, IDCB_RANGEMAX, buffer, 256);
+						int maxWhite = _wtoi(buffer);
+						ZeroMemory(buffer, sizeof(buffer));
+						pPlayer->SetWhiteRanges(minWhite, maxWhite);
+					}
+					else
+					{
+						GetDlgItemText(hwnd, IDCB_RANGEMIN, buffer, 256);
+						int minBlack = _wtoi(buffer);
+						ZeroMemory(buffer, sizeof(buffer));
+						GetDlgItemText(hwnd, IDCB_RANGEMAX, buffer, 256);
+						int maxBlack = _wtoi(buffer);
+						ZeroMemory(buffer, sizeof(buffer));
+						pPlayer->SetBlackRanges(minBlack, maxBlack);
+					}
+
+					// 显示尺寸
+					GetDlgItemText(hwnd, IDCB_DISPLAYWIDTH, buffer, 256);
+					int displayWidth = _wtoi(buffer);
+					GetDlgItemText(hwnd, IDCB_DISPLAYHEIGHT, buffer, 256);
+					int displayHeight = _wtoi(buffer);
+					pPlayer->SetDisplaySize(displayWidth, displayHeight);
+
+					// 是否启用缩放
+					BOOL resize = IsDlgButtonChecked(hwnd, IDB_USEDRESIZE) == BST_CHECKED;
+					pPlayer->SetUsedResize(resize);
+					if (resize)
+					{
+						GetDlgItemText(hwnd, IDCB_RESIZEWIDTH, buffer, 256);
+						int rw = _wtoi(buffer);
+						ZeroMemory(buffer, sizeof(buffer));
+						GetDlgItemText(hwnd, IDCB_RESIZEHEIGHT, buffer, 256);
+						int rh = _wtoi(buffer);
+						ZeroMemory(buffer, sizeof(buffer));
+						pPlayer->SetResizeSize(rw, rh);
+					}
+
+					// 最小矩形尺寸
+					GetDlgItemText(hwnd, IDCB_RECTMINSIZE, buffer, 256);
+					int RectMinSize = _wtoi(buffer);
+					ZeroMemory(buffer, sizeof(buffer));
+					pPlayer->SetRectMinSize(RectMinSize);
+
+					// 算法选择
+					int curSel = SendMessage(GetDlgItem(hwnd, IDCB_COMPUTEMETHOD), CB_GETCURSEL, 0, 0);
+					if (curSel != CB_ERR)
+					{
+						int method = (int)SendMessage(GetDlgItem(hwnd, IDCB_COMPUTEMETHOD), CB_GETITEMDATA, curSel, 0);
+						pPlayer->SetComputeMethod(static_cast<COMPUTE_WINDOW_METHOD>(method));
+					}
+
+					// 初始化
+					if (!pPlayer->AutoUpdate())
+					{
+						MessageBox(hwnd, L"初始化失败", L"错误", MB_OK);
+						delete pPlayer;
+						pPlayer = nullptr;
+						return 0;
+					}
+
+                    bRunning = TRUE;
+					SetEvent(IsPlayingEvent);
+					hPlayer = CreateThread(NULL, 0, &VTWPARAMS::PlayThread, pPlayer, 0, NULL);
+					// Ensure audio thread is running and not paused
+					pPlayer->ContinuePauseAudioThread(TRUE);
+					SendMessage(GetDlgItem(hwnd, IDB_STARTPAUSE), WM_SETTEXT, 0, (LPARAM)TEXT("暂停"));
+					StartAndPauseStatus = TRUE;
 				}
-				pPlayer = new VTWPARAMS();
-
-				// 从控件获取值并设置到 pPlayer（示例）
-				CHAR path[MAX_PATH];
-				GetDlgItemTextA(hwnd, IDE_PATH, path, MAX_PATH);
-				pPlayer->SetVideoPath(path);
-
-				// 替代颜色
-				if (IsDlgButtonChecked(hwnd, IDB_INSTEADCOLORWHITE) == BST_CHECKED)
-					pPlayer->SetInsteadColor(WHITE);
-				else
-					pPlayer->SetInsteadColor(BLACK);
-
-				// 范围
-				if (IsDlgButtonChecked(hwnd, IDB_INSTEADCOLORWHITE) == BST_CHECKED)
+				else if (pPlayer && !pPlayer->IsPlayEnded())
 				{
-					GetDlgItemText(hwnd, IDCB_RANGEMIN, buffer, 256);
-					int minWhite = _wtoi(buffer);
-					ZeroMemory(buffer, sizeof(buffer));
-					GetDlgItemText(hwnd, IDCB_RANGEMAX, buffer, 256);
-					int maxWhite = _wtoi(buffer);
-					ZeroMemory(buffer, sizeof(buffer));
-					pPlayer->SetWhiteRanges(minWhite, maxWhite);
-				}
-				else
-				{
-					GetDlgItemText(hwnd, IDCB_RANGEMIN, buffer, 256);
-					int minBlack = _wtoi(buffer);
-					ZeroMemory(buffer, sizeof(buffer));
-					GetDlgItemText(hwnd, IDCB_RANGEMAX, buffer, 256);
-					int maxBlack = _wtoi(buffer);
-					ZeroMemory(buffer, sizeof(buffer));
-					pPlayer->SetBlackRanges(minBlack, maxBlack);
-				}
-
-				// 显示尺寸
-				GetDlgItemText(hwnd, IDCB_DISPLAYWIDTH, buffer, 256);
-				int displayWidth = _wtoi(buffer);
-				GetDlgItemText(hwnd, IDCB_DISPLAYHEIGHT, buffer, 256);
-				int displayHeight = _wtoi(buffer);
-				pPlayer->SetDisplaySize(displayWidth, displayHeight);
-
-				// 是否启用缩放
-				BOOL resize = IsDlgButtonChecked(hwnd, IDB_USEDRESIZE) == BST_CHECKED;
-				pPlayer->SetUsedResize(resize);
-				if (resize)
-				{
-					GetDlgItemText(hwnd, IDCB_RESIZEWIDTH, buffer, 256);
-					int rw = _wtoi(buffer);
-					ZeroMemory(buffer, sizeof(buffer));
-					GetDlgItemText(hwnd, IDCB_RESIZEHEIGHT, buffer, 256);
-					int rh = _wtoi(buffer);
-					ZeroMemory(buffer, sizeof(buffer));
-					pPlayer->SetResizeSize(rw, rh);
-				}
-
-				// 最小矩形尺寸
-				GetDlgItemText(hwnd, IDCB_RECTMINSIZE, buffer, 256);
-				int RectMinSize = _wtoi(buffer);
-				ZeroMemory(buffer, sizeof(buffer));
-				pPlayer->SetRectMinSize(RectMinSize);
-
-				// 算法选择
-				int curSel = SendMessage(GetDlgItem(hwnd, IDCB_COMPUTEMETHOD), CB_GETCURSEL, 0, 0);
-				if (curSel != CB_ERR)
-				{
-					int method = (int)SendMessage(GetDlgItem(hwnd, IDCB_COMPUTEMETHOD), CB_GETITEMDATA, curSel, 0);
-					pPlayer->SetComputeMethod(static_cast<COMPUTE_WINDOW_METHOD>(method));
-				}
-
-				// 初始化
-				if (!pPlayer->AutoUpdate())
-				{
-					MessageBox(hwnd, L"初始化失败", L"错误", MB_OK);
-					delete pPlayer;
-					pPlayer = nullptr;
+					SetEvent(IsPlayingEvent);
+					pPlayer->ContinuePauseAudioThread(TRUE);
+					SendMessage(GetDlgItem(hwnd, IDB_STARTPAUSE), WM_SETTEXT, 0, (LPARAM)TEXT("暂停"));
+					StartAndPauseStatus = TRUE;
 					return 0;
 				}
-
-				bRunning = TRUE;
-				SetEvent(IsPlayingEvent);
-				hPlayer = CreateThread(NULL, 0, &VTWPARAMS::PlayThread, pPlayer, 0, NULL);
-				SendMessage(GetDlgItem(hwnd, IDB_STARTPAUSE), WM_SETTEXT, 0, (LPARAM)TEXT("暂停"));
-				StartAndPauseStatus = TRUE;
-				return 0;
 			}
 			else
 			{
 				// 暂停
-				
 				ResetEvent(IsPlayingEvent);
+				if (pPlayer) pPlayer->ContinuePauseAudioThread(FALSE);
 				SendMessage(GetDlgItem(hwnd, IDB_STARTPAUSE), WM_SETTEXT, 0, (LPARAM)TEXT("继续"));
 				StartAndPauseStatus = FALSE;
 			}
@@ -364,17 +375,25 @@ INT_PTR VTWControlProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		case IDB_STOP:
 		{
-			ResetEvent(IsPlayingEvent);
-			WaitForSingleObject(IsPlayingEvent, INFINITE);
+           SetEvent(IsPlayingEvent);
 			bRunning = FALSE;
+			// Stop audio thread and then wait for play thread to exit before deleting player
 			if (pPlayer)
 			{
+				pPlayer->ContinuePauseAudioThread(FALSE);
 				pPlayer->StopAudioThread();
+			}
+			if (hPlayer)
+			{
+				WaitForSingleObject(hPlayer, INFINITE);
+				CloseHandle(hPlayer);
+				hPlayer = NULL;
+			}
+			if (pPlayer)
+			{
 				delete pPlayer;
 				pPlayer = nullptr;
 			}
-			WaitForSingleObject(hPlayer, INFINITE);
-			CloseHandle(hPlayer);
 			SendMessage(GetDlgItem(hwnd, IDB_STARTPAUSE), WM_SETTEXT, 0, (LPARAM)TEXT("开始"));
 			StartAndPauseStatus = FALSE;
 			return 0;
@@ -394,8 +413,8 @@ INT_PTR VTWControlProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			pPlayer->StopAudioThread();
 			delete pPlayer;
 		}
-		CloseHandle(IsPlayingEvent);
-		CloseHandle(hPlayer);
+        if (IsPlayingEvent) CloseHandle(IsPlayingEvent);
+		if (hPlayer) CloseHandle(hPlayer);
 		PostQuitMessage(0);
 		return 0;
 	}
@@ -820,6 +839,10 @@ BOOL VTWPARAMS::ComputeWindow()
 	case COMPUTE_WINDOW_METHOD::GREEDY_METHOD:
 		ComputeWindow_GREEDY_METHOD();
 		break;
+
+	case COMPUTE_WINDOW_METHOD::EXPERIMENTAL_METHOD:
+		ComputeWindow_EXPERIMENTAL_METHOD();
+		break;
 	}
 
 	if (bUsedResize)
@@ -1038,13 +1061,13 @@ VOID VTWPARAMS::ContinuePauseAudioThread(BOOL bAction)
 {
 	if (bAction)
 	{
-		SetEvent(a.hPauseEvent);      
-		a.pSourceVoice->Start(0);     
+      SetEvent(a.hPauseEvent);
+		if (a.pSourceVoice) a.pSourceVoice->Start(0);
 	}
 	else
 	{
-		ResetEvent(a.hPauseEvent);
-		a.pSourceVoice->Stop(0);
+      ResetEvent(a.hPauseEvent);
+		if (a.pSourceVoice) a.pSourceVoice->Stop(0);
 	}
 
 };
@@ -1075,20 +1098,20 @@ DWORD WINAPI VTWPARAMS::AudioThread(LPVOID lpParam)
 	WaitForSingleObject(pThis->a.hStartEvent, INFINITE);
 	pThis->a.pSourceVoice->Start(0);
 
-	while (pThis->a.bThreadRunning)
+    while (pThis->a.bThreadRunning)
 	{
-		DWORD dw = WaitForMultipleObjects(2, events, FALSE, INFINITE);
-		if (dw==WAIT_OBJECT_0)
+		DWORD dw = WaitForMultipleObjects(2, events, TRUE, INFINITE);
+		if (dw == WAIT_OBJECT_0)
 		{
 			/*进入关键段*/
 			EnterCriticalSection(&pThis->a.bufferCS);
 			int bufIdx = -1;
-			for (pThis->a.currentBufferIndex = 0; pThis->a.currentBufferIndex < 4; pThis->a.currentBufferIndex++)//遍历空闲缓冲区
+            for (int i = 0; i < 4; ++i) // 遍历空闲缓冲区
 			{
-				if (!pThis->a.bIsBufferInUse[pThis->a.currentBufferIndex])
+				if (!pThis->a.bIsBufferInUse[i])
 				{
-					bufIdx = pThis->a.currentBufferIndex;
-					pThis->a.bIsBufferInUse[pThis->a.currentBufferIndex] = true;//标记为使用中
+					bufIdx = i;
+					pThis->a.bIsBufferInUse[i] = true; // 标记为使用中
 					break;
 				}
 			}
@@ -1144,27 +1167,27 @@ DWORD WINAPI VTWPARAMS::AudioThread(LPVOID lpParam)
 				break;
 			}
 
-			int dst_samples = av_rescale_rnd(pThis->a.frame->nb_samples, pThis->a.codecCtx->sample_rate,
+            int dst_samples = av_rescale_rnd(pThis->a.frame->nb_samples, pThis->a.codecCtx->sample_rate,
 				pThis->a.codecCtx->sample_rate,
 				AV_ROUND_UP);
-			pThis->a.dst_data[0] = pThis->a.pcmBuffers[pThis->a.currentBufferIndex];
+			pThis->a.dst_data[0] = pThis->a.pcmBuffers[bufIdx];
 			int converted = swr_convert(pThis->a.SwrCtx, pThis->a.dst_data,
 				dst_samples, (const uint8_t**)pThis->a.frame->extended_data,
 				pThis->a.frame->nb_samples);
 			if (converted < 0)
 			{
 				// 转换失败，释放缓冲区标记
-				EnterCriticalSection(&pThis->a.bufferCS);
-				pThis->a.bIsBufferInUse[pThis->a.currentBufferIndex] = FALSE;
+                EnterCriticalSection(&pThis->a.bufferCS);
+				pThis->a.bIsBufferInUse[bufIdx] = FALSE;
 				SetEvent(pThis->a.hFreeBufferEvent);
 				LeaveCriticalSection(&pThis->a.bufferCS);
 				av_frame_unref(pThis->a.frame);
 				continue;
 			}
 
-			pThis->a.xaBuffer.AudioBytes = converted * pThis->a.wfx.nChannels * pThis->a.wfx.wBitsPerSample / 8;
-			pThis->a.xaBuffer.pAudioData = pThis->a.pcmBuffers[pThis->a.currentBufferIndex];
-			pThis->a.xaBuffer.pContext = (void*)static_cast<intptr_t>(pThis->a.currentBufferIndex);
+            pThis->a.xaBuffer.AudioBytes = converted * pThis->a.wfx.nChannels * pThis->a.wfx.wBitsPerSample / 8;
+			pThis->a.xaBuffer.pAudioData = pThis->a.pcmBuffers[bufIdx];
+			pThis->a.xaBuffer.pContext = (void*)static_cast<intptr_t>(bufIdx);
 			pThis->a.pSourceVoice->SubmitSourceBuffer(&pThis->a.xaBuffer);
 
 			//每提交一次音频数据，就更新一次音频时钟，单位为秒
@@ -1427,6 +1450,7 @@ DWORD WINAPI VTWPARAMS::PlayThread(LPVOID lpParam)
 	double AudioClock;
 	double diff;
 	MSG msg;
+	v->v.IsPlayEnded = FALSE;
 	while (bRunning)
 	{
 		if (WaitForSingleObject(IsPlayingEvent, INFINITE) == WAIT_OBJECT_0)
@@ -1460,5 +1484,136 @@ DWORD WINAPI VTWPARAMS::PlayThread(LPVOID lpParam)
 			}
 		}
 	}
+	v->v.IsPlayEnded = TRUE;
 	return 0;
+}
+
+BOOL VTWPARAMS::IsPlayEnded()
+{
+	return v.IsPlayEnded;
+}
+
+// 实验性算法 102：基于行运行长度（run-length）合并的快速矩形生成
+// 思路：先对每行生成连续匹配段（start,end），然后在纵向合并相同列范围的段以生成最大矩形
+// 目标：比扩展法在大块连续区域下更快，并避免多次重复检查
+VOID VTWPARAMS::ComputeWindow_EXPERIMENTAL_METHOD()
+{
+	int targetW = bUsedResize ? ResizeWidth : Width;
+	int targetH = bUsedResize ? ResizeHeight : Height;
+
+	// 清空标记
+	fill(v.processed.begin(), v.processed.end(), false);
+
+	// 每行的段集合，存储为向量的向量：每个段为 pair<start,end>
+	vector<vector<pair<int, int>>> runs(targetH);
+
+    // Parallelize per-row run generation: each row builds its own list (rowRuns) to avoid data races
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+	for (int y = 0; y < targetH; ++y)
+	{
+		std::vector<std::pair<int, int>> rowRuns;
+		int rowOff = y * targetW;
+		int x = 0;
+		while (x < targetW)
+		{
+			size_t off = static_cast<size_t>(rowOff + x);
+			if (v.processed[off]) { ++x; continue; }
+			uint8_t val = v.data[off].y;
+			bool match = !bInsteadColor ? (val >= MinWhite && val <= MaxWhite) : (val >= MinBlack && val <= MaxBlack);
+			if (!match) { ++x; continue; }
+			int start = x;
+			int end = x;
+			while (end + 1 < targetW)
+			{
+				size_t noff = static_cast<size_t>(rowOff + end + 1);
+				if (v.processed[noff]) break;
+				uint8_t nval = v.data[noff].y;
+				bool nm = !bInsteadColor ? (nval >= MinWhite && nval <= MaxWhite) : (nval >= MinBlack && nval <= MaxBlack);
+				if (!nm) break;
+				++end;
+			}
+			rowRuns.push_back({ start, end });
+			x = end + 1;
+		}
+		runs[y] = std::move(rowRuns);
+	}
+
+    // 合并纵向相同列范围的段，形成矩形
+	struct RectSeg { int sx; int top; int ex; int bottom; };
+	vector<vector<RectSeg>> rectsByRow(targetH);
+
+	// Parallelize detection of vertical merges: each row computes its own rectangles into rectsByRow[y]
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+	for (int y = 0; y < targetH; ++y)
+	{
+		auto &localRuns = runs[y];
+		auto &localRects = rectsByRow[y];
+		localRects.reserve(localRuns.size());
+		for (auto &seg : localRuns)
+		{
+			int sx = seg.first;
+			int ex = seg.second;
+			int top = y;
+			int bottom = y;
+			// 尝试向下合并（只读取 runs，安全并行）
+			for (int ny = y + 1; ny < targetH; ++ny)
+			{
+				bool found = false;
+				for (auto &nseg : runs[ny])
+				{
+					if (nseg.first <= sx && nseg.second >= ex)
+					{
+						found = true;
+						break;
+					}
+				}
+				if (found) bottom = ny;
+				else break;
+			}
+			localRects.push_back({ sx, top, ex, bottom });
+		}
+	}
+
+	// Serially apply rectangles: mark v.processed and output windows to avoid races
+	for (int y = 0; y < targetH; ++y)
+	{
+		for (auto &r : rectsByRow[y])
+		{
+			int sx = r.sx;
+			int top = r.top;
+			int ex = r.ex;
+			int bottom = r.bottom;
+
+			// skip if already marked (overlap resolved serially)
+			if (v.processed[static_cast<size_t>(top * targetW + sx)]) continue;
+
+			int rectW = ex - sx + 1;
+			int rectH = bottom - top + 1;
+
+			// 标记为已处理
+			for (int yy = top; yy <= bottom; ++yy)
+			{
+				int rowOff = yy * targetW;
+				for (int xx = sx; xx <= ex; ++xx)
+					v.processed[static_cast<size_t>(rowOff + xx)] = true;
+			}
+
+			// 输出窗口（考虑缩放）
+			if (bUsedResize)
+			{
+				if (max(rectW, rectH) >= RectMinSizeLong / ResizeRatioX && min(rectW, rectH) >= RectMinSizeShort / ResizeRatioY)
+					v.ResizeTemp.push_back({ sx, top, sx + rectW, top + rectH });
+			}
+			else
+			{
+				if (max(rectW, rectH) >= RectMinSizeLong && min(rectW, rectH) >= RectMinSizeShort)
+					RectToWindow(sx + startx, top + starty, rectW, rectH);
+			}
+		}
+	}
+
 }
