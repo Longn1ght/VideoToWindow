@@ -11,6 +11,8 @@
 #include <vector>
 #include <Windows.h>
 #include <xaudio2.h>
+#include <d3d11.h>
+#include <d3dcompiler.h>
 
 #include "resource.h"
 
@@ -22,6 +24,7 @@ extern "C"
 #include <libavutil/avutil.h>
 #include <libavutil/imgutils.h>   
 #include <libswresample/swresample.h>
+#include <libavutil/hwcontext.h>
 }
 
 #pragma comment(lib,"winmm.lib")
@@ -34,6 +37,9 @@ extern "C"
 #pragma comment(lib, "xaudio2.lib")
 #pragma comment(lib, "swresample.lib")
 #pragma comment(lib, "Shlwapi.lib")
+
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "d3dcompiler.lib")
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
@@ -90,6 +96,8 @@ struct VIDEOPARAMS
 	vector<RECT>ResizeTemp;//缩放后窗口的临时矩形，避免在循环中频繁创建RECT对象
 	double VideoPTS;
 	BOOL IsPlayEnded;
+	AVBufferRef* hwDeviceCtx;
+	char hwDeviceName[128];
 };
 
 //音频相关参数结构体
@@ -107,8 +115,8 @@ struct AUDIOPARAMS
 	IXAudio2SourceVoice* pSourceVoice;
 	IXAudio2MasteringVoice* pMasteringVoice;
 	uint8_t* pcmBuffers[4];
-	uint8_t* dst_data[8] = {nullptr};
-	bool bIsBufferInUse[4] = {FALSE};
+	uint8_t* dst_data[8] = { nullptr };
+	bool bIsBufferInUse[4] = { FALSE };
 	int currentBufferIndex;
 	CRITICAL_SECTION bufferCS;//关键段，保护缓冲区状态的访问
 	HANDLE hFreeBufferEvent;//空闲缓冲区事件，通知音频线程有空闲缓冲区可以使用
@@ -129,7 +137,7 @@ enum COMPUTE_WINDOW_METHOD
 {
 	EXTEND_METHOD = 100,
 	GREEDY_METHOD = 101,
-    EXPERIMENTAL_METHOD = 102,
+	EXPERIMENTAL_METHOD = 102,
 };
 
 
@@ -140,6 +148,8 @@ inline INT_PTR CALLBACK VTWProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 }
 //VTW的主界面窗口过程
 INT_PTR CALLBACK VTWControlProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+VOID WindowInit(HWND hwnd);
+
 
 class VTWPARAMS
 {
@@ -166,12 +176,21 @@ private:
 	VIDEOPARAMS v;
 	AUDIOPARAMS a;
 
-	WNDPARAMS *pHeader;
+	BOOL bUseGPU;
+
+	ID3D11Device* d3dDevice;
+	ID3D11DeviceContext* d3dContext;
+	ID3D11ComputeShader* d3dCS;
+
+	BOOL InitD3DIfNeeded();
+	VOID ReleaseD3D();
+
+	WNDPARAMS* pHeader;
 	vector<WNDPARAMS*> WindowsPool;//窗口池，存储所有窗口的指针，降低窗口创建和销毁的开销s
 	int wndnum;
 	int startx;
 	int starty;
-    int curWndIndex;//当前窗口计数
+	int curWndIndex;//当前窗口计数
 
 public:
 	VTWPARAMS();
@@ -188,6 +207,7 @@ public:
 	int GetHeight();
 	VOID SetRectMinSize(int size);
 	VOID SetComputeMethod(COMPUTE_WINDOW_METHOD method);
+	VOID SetUseGPU(BOOL bUse);
 	double GetAudioClock();//音频时钟
 	double GetVideoPTS();//视频时钟
 	VOID ResetAudioClock();//重置音频时钟
@@ -195,6 +215,7 @@ public:
 	double GetVideoFPS();
 
 	BOOL AutoUpdate();
+	const char* GetHWDeviceInfo();
 
 	BOOL RequestFrame();
 	BOOL ComputeWindow();
@@ -205,15 +226,16 @@ public:
 	VOID DeleteNumberOfEndWindow(int number);
 	BOOL IsPlayEnded();
 
-	VOID	 ContinuePauseAudioThread(BOOL bAction);
+	VOID ContinuePauseAudioThread(BOOL bAction);
 	VOID StopAudioThread();//因为a是private的，所以需要一个public函数来停止音频线程。
-	static DWORD WINAPI AudioThread(LPVOID lpParam);
+    static DWORD WINAPI AudioThread(LPVOID lpParam);
 	static DWORD WINAPI PlayThread(LPVOID lpParam);
 
 	//算法们
 	VOID ComputeWindow_EXTEND_METHOD();
 	VOID ComputeWindow_GREEDY_METHOD();
-    VOID ComputeWindow_EXPERIMENTAL_METHOD();
+	VOID ComputeWindow_EXPERIMENTAL_METHOD();
+	BOOL ComputeWindow_EXPERIMENTAL_GPU();
 };
 
 // 设置 XAudio2 回调,提醒写入数据至XAudio2缓冲区（需要实现 IXAudio2VoiceCallback 类）

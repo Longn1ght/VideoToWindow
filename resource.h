@@ -19,6 +19,8 @@
 #define IDCB_COMPUTEMETHOD				1012
 #define IDB_STARTPAUSE					1013
 #define IDB_STOP							1014
+#define IDB_USEGPU						1015
+#define IDT_GPUINFO                     1016
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED

@@ -143,6 +143,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Method.cpp" />
     <ClCompile Include="VTW.cpp" />
   </ItemGroup>
   <ItemGroup>

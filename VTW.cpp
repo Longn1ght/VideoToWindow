@@ -17,197 +17,8 @@ INT_PTR VTWControlProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	{
 	case WM_CREATE:
 	{
-		HDC hdc = GetDC(hwnd);
-		int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
-		int dpiY = GetDeviceCaps(hdc, LOGPIXELSY);
-		ReleaseDC(hwnd, hdc);
-		float scaleX = dpiX / 96.0f;
-		float scaleY = dpiY / 96.0f;
-
 		// 控件创建
-		// 第一行：视频路径
-		CreateWindowEx(0, TEXT("STATIC"), TEXT("视频路径（绝对路径且不含中文）："),
-			WS_CHILD | WS_VISIBLE,
-			SCALE_X(20), SCALE_Y(20), SCALE_X(200), SCALE_Y(25),
-			hwnd, NULL, g_hInstance, NULL);
-
-		CreateWindowEx(0, TEXT("EDIT"), TEXT(""),
-			WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
-			SCALE_X(230), SCALE_Y(20), SCALE_X(450), SCALE_Y(25),
-			hwnd, (HMENU)IDE_PATH, g_hInstance, NULL);
-
-		CreateWindowEx(0, TEXT("BUTTON"), TEXT("..."),
-			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-			SCALE_X(700), SCALE_Y(20), SCALE_X(25), SCALE_Y(25),
-			hwnd, (HMENU)IDB_PATHCHOOSE, g_hInstance, NULL);
-
-		// 第二行：窗口替代颜色组框
-		CreateWindowEx(0, TEXT("BUTTON"), TEXT("窗口替代颜色"),
-			WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
-			SCALE_X(20), SCALE_Y(60), SCALE_X(350), SCALE_Y(70),
-			hwnd, NULL, g_hInstance, NULL);
-
-		// 内部：白、黑复选框，最小/最大范围组合框
-		CreateWindowExW(0, TEXT("BUTTON"), TEXT("白"),
-			WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
-			SCALE_X(30), SCALE_Y(80), SCALE_X(40), SCALE_Y(20),
-			hwnd, (HMENU)IDB_INSTEADCOLORWHITE, g_hInstance, NULL);
-
-		CreateWindowEx(0, TEXT("BUTTON"), TEXT("黑"),
-			WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
-			SCALE_X(80), SCALE_Y(80), SCALE_X(40), SCALE_Y(20),
-			hwnd, (HMENU)IDB_INSTEADCOLORBLACK, g_hInstance, NULL);
-
-		CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
-			WS_CHILD | WS_VISIBLE | CBS_DROPDOWN,
-			SCALE_X(130), SCALE_Y(78), SCALE_X(70), SCALE_Y(200),
-			hwnd, (HMENU)IDCB_RANGEMIN, g_hInstance, NULL);
-
-		CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
-			WS_CHILD | WS_VISIBLE | CBS_DROPDOWN,
-			SCALE_X(210), SCALE_Y(78), SCALE_X(70), SCALE_Y(200),
-			hwnd, (HMENU)IDCB_RANGEMAX, g_hInstance, NULL);
-
-		// 第二行右侧：显示尺寸组框
-		CreateWindowEx(0, TEXT("BUTTON"), TEXT("显示尺寸"),
-			WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
-			SCALE_X(400), SCALE_Y(60), SCALE_X(250), SCALE_Y(70),
-			hwnd, NULL, g_hInstance, NULL);
-
-		CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
-			WS_CHILD | WS_VISIBLE | CBS_DROPDOWN,
-			SCALE_X(410), SCALE_Y(80), SCALE_X(100), SCALE_Y(200),
-			hwnd, (HMENU)IDCB_DISPLAYWIDTH, g_hInstance, NULL);
-
-		CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
-			WS_CHILD | WS_VISIBLE | CBS_DROPDOWN,
-			SCALE_X(530), SCALE_Y(80), SCALE_X(100), SCALE_Y(200),
-			hwnd, (HMENU)IDCB_DISPLAYHEIGHT, g_hInstance, NULL);
-
-		// 第三行：缩放设置组框
-		CreateWindowEx(0, TEXT("BUTTON"), TEXT("缩放设置"),
-			WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
-			SCALE_X(20), SCALE_Y(140), SCALE_X(450), SCALE_Y(70),
-			hwnd, NULL, g_hInstance, NULL);
-
-		CreateWindowEx(0, TEXT("BUTTON"), TEXT("启用缩放"),
-			WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-			SCALE_X(30), SCALE_Y(160), SCALE_X(120), SCALE_Y(20),
-			hwnd, (HMENU)IDB_USEDRESIZE, g_hInstance, NULL);
-
-		CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
-			WS_CHILD | WS_VISIBLE | WS_DISABLED | CBS_DROPDOWN,
-			SCALE_X(170), SCALE_Y(160), SCALE_X(100), SCALE_Y(200),
-			hwnd, (HMENU)IDCB_RESIZEWIDTH, g_hInstance, NULL);
-
-		CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
-			WS_CHILD | WS_VISIBLE | WS_DISABLED | CBS_DROPDOWN,
-			SCALE_X(290), SCALE_Y(160), SCALE_X(100), SCALE_Y(200),
-			hwnd, (HMENU)IDCB_RESIZEHEIGHT, g_hInstance, NULL);
-
-		// 第四行：矩形参数组框
-		CreateWindowEx(0, TEXT("BUTTON"), TEXT("矩形参数"),
-			WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
-			SCALE_X(20), SCALE_Y(220), SCALE_X(450), SCALE_Y(70),
-			hwnd, NULL, g_hInstance, NULL);
-
-		CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
-			WS_CHILD | WS_VISIBLE | CBS_DROPDOWN,
-			SCALE_X(30), SCALE_Y(240), SCALE_X(150), SCALE_Y(200),
-			hwnd, (HMENU)IDCB_RECTMINSIZE, g_hInstance, NULL);
-
-		CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
-			WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
-			SCALE_X(210), SCALE_Y(240), SCALE_X(150), SCALE_Y(200),
-			hwnd, (HMENU)IDCB_COMPUTEMETHOD, g_hInstance, NULL);
-
-		// 第四行：按钮
-		CreateWindowEx(0, TEXT("BUTTON"), TEXT("开始"),
-			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-			SCALE_X(500), SCALE_Y(230), SCALE_X(100), SCALE_Y(30),
-			hwnd, (HMENU)IDB_STARTPAUSE, g_hInstance, NULL);
-
-		CreateWindowEx(0, TEXT("BUTTON"), TEXT("停止"),
-			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-			SCALE_X(620), SCALE_Y(230), SCALE_X(100), SCALE_Y(30),
-			hwnd, (HMENU)IDB_STOP, g_hInstance, NULL);
-
-		//获取ComboBox控件句柄
-		HWND hRangeMin = GetDlgItem(hwnd, IDCB_RANGEMIN);
-		HWND hRangeMax = GetDlgItem(hwnd, IDCB_RANGEMAX);
-		HWND hDisplayShort = GetDlgItem(hwnd, IDCB_DISPLAYWIDTH);
-		HWND hDisplayHeight = GetDlgItem(hwnd, IDCB_DISPLAYHEIGHT);
-		HWND hResizeShort = GetDlgItem(hwnd, IDCB_RESIZEWIDTH);
-		HWND hResizeHeight = GetDlgItem(hwnd, IDCB_RESIZEHEIGHT);
-		HWND hRectMinSize = GetDlgItem(hwnd, IDCB_RECTMINSIZE);
-		HWND hComputeMethod = GetDlgItem(hwnd, IDCB_COMPUTEMETHOD);
-
-		SendMessage(hRangeMin, CB_ADDSTRING, 0, (LPARAM)TEXT("225"));
-		SendMessage(hRangeMin, CB_ADDSTRING, 0, (LPARAM)TEXT("129"));
-		SendMessage(hRangeMin, CB_ADDSTRING, 0, (LPARAM)TEXT("16"));
-		SendMessage(hRangeMin, CB_ADDSTRING, 0, (LPARAM)TEXT("0"));
-		SendMessage(hRangeMax, CB_ADDSTRING, 0, (LPARAM)TEXT("255"));
-		SendMessage(hRangeMax, CB_ADDSTRING, 0, (LPARAM)TEXT("255"));
-		SendMessage(hRangeMax, CB_ADDSTRING, 0, (LPARAM)TEXT("46"));
-		SendMessage(hRangeMax, CB_ADDSTRING, 0, (LPARAM)TEXT("127"));
-
-		const int displayWidthPresets[] = { 640, 800, 1024, 1280, 1366, 1600, 1920 };
-		for (int val : displayWidthPresets)
-		{
-			wchar_t text[16];
-			wsprintf(text, TEXT("%d"), val);
-			SendMessage(hDisplayShort, CB_ADDSTRING, 0, (LPARAM)text);
-		}
-
-		const int displayHeightPresets[] = { 480, 600, 768, 720, 768, 900, 1080 };
-		for (int val : displayHeightPresets)
-		{
-			wchar_t text[16];
-			wsprintf(text, TEXT("%d"), val);
-			SendMessage(hDisplayHeight, CB_ADDSTRING, 0, (LPARAM)text);
-		}
-
-		const int resizeWidthPresets[] = { 64, 80, 96, 112, 128, 160, 320 };
-		for (int val : resizeWidthPresets)
-		{
-			wchar_t text[16];
-			wsprintf(text, TEXT("%d"), val);
-			SendMessage(hResizeShort, CB_ADDSTRING, 0, (LPARAM)text);
-		}
-
-		const int resizeHeightPresets[] = { 36, 45, 54, 63, 72, 90, 180 };
-		for (int val : resizeHeightPresets)
-		{
-			wchar_t text[16];
-			wsprintf(text, TEXT("%d"), val);
-			SendMessage(hResizeHeight, CB_ADDSTRING, 0, (LPARAM)text);
-		}
-
-		const int minSizePresets[] = { 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32 };
-		for (int val : minSizePresets)
-		{
-			wchar_t text[16];
-			wsprintf(text, TEXT("%d"), val);
-			SendMessage(hRectMinSize, CB_ADDSTRING, 0, (LPARAM)text);
-		}
-
-		int idx = SendMessage(hComputeMethod, CB_ADDSTRING, 0, (LPARAM)TEXT("扩展法 (100)"));
-		SendMessage(hComputeMethod, CB_SETITEMDATA, idx, (LPARAM)EXTEND_METHOD);
-		idx = SendMessage(hComputeMethod, CB_ADDSTRING, 0, (LPARAM)TEXT("贪心算法 (101) 灵感来源：https://github.com/mon/bad_apple_virus,由AI转写"));
-		SendMessage(hComputeMethod, CB_SETITEMDATA, idx, (LPARAM)GREEDY_METHOD);
-        idx = SendMessage(hComputeMethod, CB_ADDSTRING, 0, (LPARAM)TEXT("实验算法 (102) 实验性"));
-		SendMessage(hComputeMethod, CB_SETITEMDATA, idx, (LPARAM)EXPERIMENTAL_METHOD);
-		SendMessage(hComputeMethod, CB_SETCURSEL, 0, 0);
-
-		SendMessage(hRangeMin, CB_SETCURSEL, 0, 0);
-		SendMessage(hRangeMax, CB_SETCURSEL, 0, 0);
-		SendMessage(hDisplayShort, CB_SETCURSEL, 0, 0);
-		SendMessage(hDisplayHeight, CB_SETCURSEL, 0, 0);
-		SendMessage(hResizeShort, CB_SETCURSEL, 0, 0);
-		SendMessage(hResizeHeight, CB_SETCURSEL, 0, 0);
-		SendMessage(hRectMinSize, CB_SETCURSEL, 0, 0);
-		SendMessage(hComputeMethod, CB_SETCURSEL, 0, 0);
-
+		WindowInit(hwnd);
 		IsPlayingEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
 		return 0;
 	}
@@ -272,6 +83,10 @@ INT_PTR VTWControlProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					CHAR path[MAX_PATH];
 					GetDlgItemTextA(hwnd, IDE_PATH, path, MAX_PATH);
 					pPlayer->SetVideoPath(path);
+
+					// GPU 选项
+					BOOL useGPU = IsDlgButtonChecked(hwnd, IDB_USEGPU) == BST_CHECKED;
+					pPlayer->SetUseGPU(useGPU);
 
 					// 替代颜色
 					if (IsDlgButtonChecked(hwnd, IDB_INSTEADCOLORWHITE) == BST_CHECKED)
@@ -343,6 +158,14 @@ INT_PTR VTWControlProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						delete pPlayer;
 						pPlayer = nullptr;
 						return 0;
+					}
+
+					// 更新 GPU 信息显示
+					HWND hGpuInfo = GetDlgItem(hwnd, IDT_GPUINFO);
+					if (hGpuInfo)
+					{
+						const char* info = pPlayer->GetHWDeviceInfo();
+						SetWindowTextA(hGpuInfo, info);
 					}
 
                     bRunning = TRUE;
@@ -449,6 +272,17 @@ VTWPARAMS::VTWPARAMS()
 	v.pkt = av_packet_alloc();
 	v.VideoPTS = 0.0;
 
+	// hw device ctx init
+	v.hwDeviceCtx = nullptr;
+
+	// 默认不使用 GPU
+	bUseGPU = FALSE;
+
+	// D3D11 members
+	d3dDevice = nullptr;
+	d3dContext = nullptr;
+	d3dCS = nullptr;
+
 	//音频结构体初始化
 	a.bThreadRunning = FALSE;
 	a.hThread = nullptr;
@@ -531,6 +365,16 @@ VTWPARAMS::~VTWPARAMS()
 		a.pCallback = nullptr;
 	}
 
+	// 清理 hw device context（如果存在）
+	if (v.hwDeviceCtx)
+	{
+		av_buffer_unref(&v.hwDeviceCtx);
+		v.hwDeviceCtx = nullptr;
+	}
+
+	// Release D3D resources
+	ReleaseD3D();
+
 	av_frame_free(&v.frame);
 	av_frame_free(&a.frame);
 	av_packet_free(&v.pkt);
@@ -547,6 +391,11 @@ VOID VTWPARAMS::SetVideoPath(LPSTR lpFileName)
 {
 	StringCchCopyA(szFileName, MAX_PATH, lpFileName);
 	return;
+}
+
+VOID VTWPARAMS::SetUseGPU(BOOL bUse)
+{
+	bUseGPU = bUse;
 }
 
 VOID VTWPARAMS::SetWhiteRanges(int min, int max)
@@ -666,6 +515,28 @@ BOOL VTWPARAMS::AutoUpdate()
 			v.VideoStreamIndex = i;
 			v.codecCtx = avcodec_alloc_context3(vcodec);
 			avcodec_parameters_to_context(v.codecCtx, v.fmtCtx->streams[i]->codecpar);
+            // 如果启用 GPU，尝试创建 hw device 并绑定到 codecCtx（实验性）
+			if (bUseGPU)
+			{
+				const char* try_names[] = { "d3d11va", "dxva2", "cuda", NULL };
+				for (const char** p = try_names; *p != NULL; ++p)
+				{
+					AVHWDeviceType type = av_hwdevice_find_type_by_name(*p);
+					if (type == AV_HWDEVICE_TYPE_NONE)
+						continue;
+					if (av_hwdevice_ctx_create(&v.hwDeviceCtx, type, NULL, NULL, 0) == 0)
+					{
+						v.codecCtx->hw_device_ctx = av_buffer_ref(v.hwDeviceCtx);
+						// 保存设备名（简短）
+						_snprintf_s(v.hwDeviceName, _countof(v.hwDeviceName), _TRUNCATE, "%s", *p);
+						break;
+					}
+					else
+					{
+						if (v.hwDeviceCtx) { av_buffer_unref(&v.hwDeviceCtx); v.hwDeviceCtx = NULL; }
+					}
+				}
+			}
 			if (!avcodec_open2(v.codecCtx, vcodec, NULL))
 				break;
 		}
@@ -763,6 +634,48 @@ BOOL VTWPARAMS::AutoUpdate()
 	return TRUE;
 }
 
+const char* VTWPARAMS::GetHWDeviceInfo()
+{
+	if (v.hwDeviceCtx && v.hwDeviceName[0])
+		return v.hwDeviceName;
+	return "未使用 GPU 或未检测到设备";
+}
+
+BOOL VTWPARAMS::InitD3DIfNeeded()
+{
+	if (d3dDevice && d3dContext && d3dCS) return TRUE;
+	HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, NULL,
+		D3D11_CREATE_DEVICE_BGRA_SUPPORT, NULL, 0, D3D11_SDK_VERSION,
+		&d3dDevice, NULL, &d3dContext);
+	if (FAILED(hr)) return FALSE;
+
+	const char* csSource =
+		"RWTexture2D<uint> outTex : register(u0);\n"
+		"Texture2D<uint> inTex : register(t0);\n"
+		"cbuffer Params : register(b0) { uint width; uint height; uint minW; uint maxW; uint minB; uint maxB; uint instead; uint pad; };\n"
+		"[numthreads(16,16,1)] void main(uint3 DTid : SV_DispatchThreadID) {\n"
+		"  if (DTid.x >= width || DTid.y >= height) return;\n"
+		"  uint val = inTex.Load(int3(DTid.xy,0)) & 0xFF;\n"
+		"  bool match = (instead == 0) ? (val >= minW && val <= maxW) : (val >= minB && val <= maxB);\n"
+		"  outTex[DTid.xy] = match ? 1u : 0u;\n"
+		"}\n";
+
+	ID3DBlob* blob = nullptr; ID3DBlob* err = nullptr;
+	HRESULT hr2 = D3DCompile(csSource, strlen(csSource), NULL, NULL, NULL, "main", "cs_5_0", 0, 0, &blob, &err);
+	if (FAILED(hr2) || !blob) { if (err) err->Release(); return FALSE; }
+	hr2 = d3dDevice->CreateComputeShader(blob->GetBufferPointer(), blob->GetBufferSize(), NULL, &d3dCS);
+	blob->Release();
+	if (FAILED(hr2)) { if (d3dCS) { d3dCS->Release(); d3dCS = nullptr; } return FALSE; }
+	return TRUE;
+}
+
+VOID VTWPARAMS::ReleaseD3D()
+{
+	if (d3dCS) { d3dCS->Release(); d3dCS = nullptr; }
+	if (d3dContext) { d3dContext->Release(); d3dContext = nullptr; }
+	if (d3dDevice) { d3dDevice->Release(); d3dDevice = nullptr; }
+}
+
 BOOL VTWPARAMS::RequestFrame()
 {
 	while (TRUE)
@@ -774,13 +687,26 @@ BOOL VTWPARAMS::RequestFrame()
 		else if (ret == AVERROR_EOF)
 			avcodec_send_packet(v.codecCtx, NULL);
 
-		ret = avcodec_receive_frame(v.codecCtx, v.frame);
+        ret = avcodec_receive_frame(v.codecCtx, v.frame);
 
 		if (ret == 0)
 		{
 			av_packet_unref(v.pkt);
 			//获取视频PTS
 			v.VideoPTS = v.frame->pts * av_q2d(v.fmtCtx->streams[v.VideoStreamIndex]->time_base);
+            // 如果帧是 HW 上下文，需要把它转回软件帧
+			if (v.frame->hw_frames_ctx)
+			{
+				// 转换到软件可访问的帧
+				AVFrame* swFrame = av_frame_alloc();
+				if (av_hwframe_transfer_data(swFrame, v.frame, 0) >= 0)
+				{
+					av_frame_unref(v.frame);
+					// 将 swFrame 的数据复制到 v.frame
+					av_frame_move_ref(v.frame, swFrame);
+				}
+				av_frame_free(&swFrame);
+			}
 			return TRUE;
 		}
 		else if (ret == AVERROR(EAGAIN))
@@ -1211,237 +1137,211 @@ DWORD WINAPI VTWPARAMS::AudioThread(LPVOID lpParam)
 	return 0;
 };
 
-// （1.1更新，方便添加算法）算法实现部分
-// 1.1版本作者决定增添注释方便阅读，主要放假比较有空，把注释补一补，
-// 其他大部分在没有注释的情况下阅读起来难度不大，因此简略注释或不注释它处
-VOID VTWPARAMS::ComputeWindow_EXTEND_METHOD()
+VOID WindowInit(HWND hwnd)
 {
-	// 重置标记数组
-	fill(v.processed.begin(), v.processed.end(), false);
+	HDC hdc = GetDC(hwnd);
+	int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
+	int dpiY = GetDeviceCaps(hdc, LOGPIXELSY);
+	ReleaseDC(hwnd, hdc);
+	float scaleX = dpiX / 96.0f;
+	float scaleY = dpiY / 96.0f;
 
-	// 根据是否启用缩放选择处理的目标尺寸（缩放后尺寸或显示尺寸）
-	int targetW = bUsedResize ? ResizeWidth : Width;
-	int targetH = bUsedResize ? ResizeHeight : Height;
+	// 第一行：视频路径
+	CreateWindowEx(0, TEXT("STATIC"), TEXT("视频路径（绝对路径且不含中文）："),
+		WS_CHILD | WS_VISIBLE,
+		SCALE_X(20), SCALE_Y(20), SCALE_X(200), SCALE_Y(25),
+		hwnd, NULL, g_hInstance, NULL);
 
-	/*——————各变量含义——————*/
-	//x,y分别指当前的列与行，也就是这个点的坐标
-	//rowOffBase是当前行的起始偏移量，也就是把(0,0)看作data数组的起点，那么(rowOffBase+x)就是当前点在data数组中的偏移量
-	//比如说有个点(5,20),那么它的rowOffBase就是20*Width，而它在data数组中的偏移量就是20*Width+5
-	//off是当前点在data数组中的偏移量,由第一个for循环的rowOffBase和x计算可以得知含义
-	//val是当前点的亮度值，也就是图像中点(x,y)这个像素的Y的值（关于Y是什么，可自行查阅YUV格式）
-	//match是一个布尔值，表示当前点是否满足颜色条件（根据用户选择的替代颜色和设定的范围来判断）
-	//rx是从当前点(x,y)向右扩展时，连续满足颜色条件的最大列坐标,
-	//比如说有个点(5,20)，如果它满足颜色条件，并且(6,20),(7,20)也满足，但(8,20)不满足，那么rx就是7
-	//by同理是从当前点(x,y)向下扩展时，连续满足颜色条件的最大行坐标，
-	//比如说有个点(5,20)，如果它满足颜色条件，并且(5,21),(5,22)也满足，但(5,23)不满足，那么by就是22
-	//noff是一个临时变量，用于在扩展过程中计算下一个点在data数组中的偏移量，以此确定下一个点是否满足颜色条件
-	//rowOK是一个布尔值，在向下扩展时用于判断当前行是否完全满足颜色条件，
-	//如果有任意一个点不满足，就不继续向下扩展了
-	//rectW和rectH分别是当前矩形的宽度和高度，通过计算扩展后的坐标差得到
-	for (int y = 0; y < targetH; ++y)
+	CreateWindowEx(0, TEXT("EDIT"), TEXT(""),
+		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+		SCALE_X(230), SCALE_Y(20), SCALE_X(450), SCALE_Y(25),
+		hwnd, (HMENU)IDE_PATH, g_hInstance, NULL);
+
+	CreateWindowEx(0, TEXT("BUTTON"), TEXT("..."),
+		WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+		SCALE_X(700), SCALE_Y(20), SCALE_X(25), SCALE_Y(25),
+		hwnd, (HMENU)IDB_PATHCHOOSE, g_hInstance, NULL);
+
+	// 第二行：窗口替代颜色组框
+	CreateWindowEx(0, TEXT("BUTTON"), TEXT("窗口替代颜色"),
+		WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
+		SCALE_X(20), SCALE_Y(60), SCALE_X(350), SCALE_Y(70),
+		hwnd, NULL, g_hInstance, NULL);
+
+	// 内部：白、黑复选框，最小/最大范围组合框
+	CreateWindowEx(0, TEXT("BUTTON"), TEXT("白"),
+		WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
+		SCALE_X(30), SCALE_Y(80), SCALE_X(40), SCALE_Y(20),
+		hwnd, (HMENU)IDB_INSTEADCOLORWHITE, g_hInstance, NULL);
+
+	CreateWindowEx(0, TEXT("BUTTON"), TEXT("黑"),
+		WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
+		SCALE_X(80), SCALE_Y(80), SCALE_X(40), SCALE_Y(20),
+		hwnd, (HMENU)IDB_INSTEADCOLORBLACK, g_hInstance, NULL);
+
+	CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
+		WS_CHILD | WS_VISIBLE | CBS_DROPDOWN,
+		SCALE_X(130), SCALE_Y(78), SCALE_X(70), SCALE_Y(200),
+		hwnd, (HMENU)IDCB_RANGEMIN, g_hInstance, NULL);
+
+	CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
+		WS_CHILD | WS_VISIBLE | CBS_DROPDOWN,
+		SCALE_X(210), SCALE_Y(78), SCALE_X(70), SCALE_Y(200),
+		hwnd, (HMENU)IDCB_RANGEMAX, g_hInstance, NULL);
+
+	// 第二行右侧：显示尺寸组框
+	CreateWindowEx(0, TEXT("BUTTON"), TEXT("显示尺寸"),
+		WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
+		SCALE_X(400), SCALE_Y(60), SCALE_X(250), SCALE_Y(70),
+		hwnd, NULL, g_hInstance, NULL);
+
+	CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
+		WS_CHILD | WS_VISIBLE | CBS_DROPDOWN,
+		SCALE_X(410), SCALE_Y(80), SCALE_X(100), SCALE_Y(200),
+		hwnd, (HMENU)IDCB_DISPLAYWIDTH, g_hInstance, NULL);
+
+	CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
+		WS_CHILD | WS_VISIBLE | CBS_DROPDOWN,
+		SCALE_X(530), SCALE_Y(80), SCALE_X(100), SCALE_Y(200),
+		hwnd, (HMENU)IDCB_DISPLAYHEIGHT, g_hInstance, NULL);
+
+	// 第三行：缩放设置组框
+	CreateWindowEx(0, TEXT("BUTTON"), TEXT("缩放设置"),
+		WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
+		SCALE_X(20), SCALE_Y(140), SCALE_X(450), SCALE_Y(70),
+		hwnd, NULL, g_hInstance, NULL);
+
+	CreateWindowEx(0, TEXT("BUTTON"), TEXT("启用缩放"),
+		WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+		SCALE_X(30), SCALE_Y(160), SCALE_X(120), SCALE_Y(20),
+		hwnd, (HMENU)IDB_USEDRESIZE, g_hInstance, NULL);
+
+	// GPU 实验复选框（放在更下方以避免与缩放控件重叠）
+	CreateWindowEx(0, TEXT("BUTTON"), TEXT("启用实验性 GPU 解码"),
+		WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+		SCALE_X(30), SCALE_Y(190), SCALE_X(340), SCALE_Y(20),
+		hwnd, (HMENU)IDB_USEGPU, g_hInstance, NULL);
+
+	CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
+		WS_CHILD | WS_VISIBLE | WS_DISABLED | CBS_DROPDOWN,
+		SCALE_X(170), SCALE_Y(160), SCALE_X(100), SCALE_Y(200),
+		hwnd, (HMENU)IDCB_RESIZEWIDTH, g_hInstance, NULL);
+
+	CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
+		WS_CHILD | WS_VISIBLE | WS_DISABLED | CBS_DROPDOWN,
+		SCALE_X(290), SCALE_Y(160), SCALE_X(100), SCALE_Y(200),
+		hwnd, (HMENU)IDCB_RESIZEHEIGHT, g_hInstance, NULL);
+
+	// GPU 信息静态控件
+	CreateWindowEx(0, TEXT("STATIC"), TEXT("GPU: 未检测"),
+		WS_CHILD | WS_VISIBLE,
+		SCALE_X(400), SCALE_Y(190), SCALE_X(420), SCALE_Y(20),
+		hwnd, (HMENU)IDT_GPUINFO, g_hInstance, NULL);
+
+	// 第四行：矩形参数组框
+	CreateWindowEx(0, TEXT("BUTTON"), TEXT("矩形参数"),
+		WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
+		SCALE_X(20), SCALE_Y(220), SCALE_X(450), SCALE_Y(70),
+		hwnd, NULL, g_hInstance, NULL);
+
+	CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
+		WS_CHILD | WS_VISIBLE | CBS_DROPDOWN,
+		SCALE_X(30), SCALE_Y(240), SCALE_X(150), SCALE_Y(200),
+		hwnd, (HMENU)IDCB_RECTMINSIZE, g_hInstance, NULL);
+
+	CreateWindowEx(0, TEXT("COMBOBOX"), TEXT(""),
+		WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
+		SCALE_X(210), SCALE_Y(240), SCALE_X(150), SCALE_Y(200),
+		hwnd, (HMENU)IDCB_COMPUTEMETHOD, g_hInstance, NULL);
+
+	// 第四行：按钮
+	CreateWindowEx(0, TEXT("BUTTON"), TEXT("开始"),
+		WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+		SCALE_X(500), SCALE_Y(230), SCALE_X(100), SCALE_Y(30),
+		hwnd, (HMENU)IDB_STARTPAUSE, g_hInstance, NULL);
+
+	CreateWindowEx(0, TEXT("BUTTON"), TEXT("停止"),
+		WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+		SCALE_X(620), SCALE_Y(230), SCALE_X(100), SCALE_Y(30),
+		hwnd, (HMENU)IDB_STOP, g_hInstance, NULL);
+
+	//获取ComboBox控件句柄
+	HWND hRangeMin = GetDlgItem(hwnd, IDCB_RANGEMIN);
+	HWND hRangeMax = GetDlgItem(hwnd, IDCB_RANGEMAX);
+	HWND hDisplayShort = GetDlgItem(hwnd, IDCB_DISPLAYWIDTH);
+	HWND hDisplayHeight = GetDlgItem(hwnd, IDCB_DISPLAYHEIGHT);
+	HWND hResizeShort = GetDlgItem(hwnd, IDCB_RESIZEWIDTH);
+	HWND hResizeHeight = GetDlgItem(hwnd, IDCB_RESIZEHEIGHT);
+	HWND hRectMinSize = GetDlgItem(hwnd, IDCB_RECTMINSIZE);
+	HWND hComputeMethod = GetDlgItem(hwnd, IDCB_COMPUTEMETHOD);
+
+	SendMessage(hRangeMin, CB_ADDSTRING, 0, (LPARAM)TEXT("225"));
+	SendMessage(hRangeMin, CB_ADDSTRING, 0, (LPARAM)TEXT("129"));
+	SendMessage(hRangeMin, CB_ADDSTRING, 0, (LPARAM)TEXT("16"));
+	SendMessage(hRangeMin, CB_ADDSTRING, 0, (LPARAM)TEXT("0"));
+	SendMessage(hRangeMax, CB_ADDSTRING, 0, (LPARAM)TEXT("255"));
+	SendMessage(hRangeMax, CB_ADDSTRING, 0, (LPARAM)TEXT("255"));
+	SendMessage(hRangeMax, CB_ADDSTRING, 0, (LPARAM)TEXT("46"));
+	SendMessage(hRangeMax, CB_ADDSTRING, 0, (LPARAM)TEXT("127"));
+
+	const int displayWidthPresets[] = { 640, 800, 1024, 1280, 1366, 1600, 1920 };
+	for (int val : displayWidthPresets)
 	{
-		int rowOffBase = y * targetW;
-		for (int x = 0; x < targetW; ++x)
-		{
-			size_t off = static_cast<size_t>(rowOffBase + x);
-			if (v.processed[off]) continue;
-
-			uint8_t val = v.data[off].y;
-			bool match = !bInsteadColor ? (val >= MinWhite && val <= MaxWhite) : (val >= MinBlack && val <= MaxBlack);
-			if (!match) continue;
-
-			// 从 (x, y) 向右扩展，找到连续匹配的最大 rx
-			int rx = x;//先令rx为x，再进行下一步计算
-			while (rx + 1 < targetW)//在0至targetW-1的范围内扩展，直到遇到不满足条件的点或者越界
-			{
-				size_t noff = static_cast<size_t>(rowOffBase + rx + 1);
-				if (v.processed[noff])
-					break;
-				uint8_t mval = v.data[noff].y;
-				bool nmatch = !bInsteadColor ? (mval >= MinWhite && mval <= MaxWhite) : (mval >= MinBlack && mval <= MaxBlack);
-				if (!nmatch)
-					break;
-				++rx;
-			}
-
-			// 从 (x, y) 向下扩展，找到连续匹配的最大 by
-			int by = y;
-			while (by + 1 < targetH)
-			{
-				bool rowOK = true;// 先假设当前行完全匹配，后续检查如果发现有不匹配的点就置为false
-				int nextRowOff = (by + 1) * targetW;
-				for (int xx = x; xx <= rx; ++xx)
-				{
-					size_t noff = static_cast<size_t>(nextRowOff + xx);
-					if (v.processed[noff])//如果下一个点已经被处理过了，那么说明它之前已经被某个矩形覆盖了，
-						//不应该再继续扩展了，否则会导致重叠的矩形过多，性能下降
-					{
-						rowOK = false;
-						break;
-					}
-					uint8_t nval = v.data[noff].y;
-					bool m = !bInsteadColor ? (nval >= MinWhite && nval <= MaxWhite) : (nval >= MinBlack && nval <= MaxBlack);
-					if (!m)
-					{
-						rowOK = false;
-						break;
-					}
-				}
-				if (!rowOK)
-					break;
-				++by;
-			}
-
-			// 标记矩形区域为已处理
-			for (int yy = y; yy <= by; ++yy)
-			{
-				int rowOff = yy * targetW;
-				for (int xx = x; xx <= rx; ++xx)
-				{
-					v.processed[static_cast<size_t>(rowOff + xx)] = true;
-				}
-			}
-
-			//计算当前矩形的宽高（注意这里是坐标差+1，因为坐标是从0开始的）
-			int rectW = rx - x + 1;
-			int rectH = by - y + 1;
-			//是否启用缩放
-			if (bUsedResize)
-				//确定当前矩形是否满足最小尺寸要求
-				if (max(rectW, rectH) >= RectMinSizeLong / ResizeRatioX && min(rectW, rectH) >= RectMinSizeShort / ResizeRatioY)
-					v.ResizeTemp.push_back({ x, y, x + rectW, y + rectH });//把当前矩形的坐标和尺寸存入ResizeTemp，等会再次进行放大缩放
-				else
-					if (max(rectW, rectH) >= RectMinSizeLong && min(rectW, rectH) >= RectMinSizeShort)
-						RectToWindow(x + startx, y + starty, rectW, rectH);
-
-			x = rx;	// 跳过已处理的部分
-		}
+		wchar_t text[16];
+		wsprintf(text, TEXT("%d"), val);
+		SendMessage(hDisplayShort, CB_ADDSTRING, 0, (LPARAM)text);
 	}
-}
 
-// 贪心算法,灵感来源：https://github.com/mon/bad_apple_virus
-VOID VTWPARAMS::ComputeWindow_GREEDY_METHOD()
-{
-	// 类似 Python 版：重复寻找当前帧中面积最大的连续匹配矩形，标记访问并记录
-	int targetW = bUsedResize ? ResizeWidth : Width;
-	int targetH = bUsedResize ? ResizeHeight : Height;
-	size_t planeSize = static_cast<size_t>(targetW) * static_cast<size_t>(targetH);
-
-	// 使用一个简单的访问标记数组（0 表示未访问，1 表示已访问或不匹配）
-	vector<char> visited(planeSize, 0);
-
-	// 不使用 v.Mergetemp；直接把贪心找到的矩形传给 RectToWindow
-
-	while (true)
+	const int displayHeightPresets[] = { 480, 600, 768, 720, 768, 900, 1080 };
+	for (int val : displayHeightPresets)
 	{
-		bool foundAny = false;
-		int bestArea = 0;
-		int bestX = 0, bestY = 0, bestW = 0, bestH = 0;
-
-		// 在所有像素点尝试以该点为左上角的最大矩形
-		for (int y = 0; y < targetH; ++y)
-		{
-			int rowOffBase = y * targetW;
-			for (int x = 0; x < targetW; ++x)
-			{
-				size_t off = static_cast<size_t>(rowOffBase + x);
-				if (visited[off]) continue;
-
-				uint8_t val = v.data[off].y;
-				bool match = !bInsteadColor ? (val >= MinWhite && val <= MaxWhite) : (val >= MinBlack && val <= MaxBlack);
-				if (!match)
-				{
-					// 非目标像素，标记为已访问以加速后续搜索
-					visited[off] = 1;
-					continue;
-				}
-
-				// 以 (x,y) 为左上角，向下逐行扩展，维护当前行的最小可用宽度 widest
-				int widest = targetW - x;
-				int bestLocalW = 0, bestLocalH = 0;
-
-				for (int h = 0; h < targetH - y; ++h)
-				{
-					int curRow = y + h;
-					int curW = 0;
-					int curRowOff = curRow * targetW + x;
-
-					// 计算当前行从 x 开始连续匹配的宽度（不超过 widest）
-					for (int wx = 0; wx < widest; ++wx)
-					{
-						size_t noff = static_cast<size_t>(curRowOff + wx);
-						if (visited[noff])
-						{
-							break;
-						}
-						uint8_t nval = v.data[noff].y;
-						bool nmatch = !bInsteadColor ? (nval >= MinWhite && nval <= MaxWhite) : (nval >= MinBlack && nval <= MaxBlack);
-						if (!nmatch) break;
-						++curW;
-					}
-
-					if (curW == 0) break; // 当前行无法延展
-
-					if (curW < widest) widest = curW;
-
-					int area = widest * (h + 1);
-					if (area > bestLocalW * bestLocalH)
-					{
-						bestLocalW = widest;
-						bestLocalH = h + 1;
-					}
-				}
-
-				if (bestLocalW > 0 && bestLocalH > 0)
-				{
-					int area = bestLocalW * bestLocalH;
-					if (area > bestArea)
-					{
-						bestArea = area;
-						bestX = x;
-						bestY = y;
-						bestW = bestLocalW;
-						bestH = bestLocalH;
-						foundAny = true;
-					}
-				}
-			}
-		}
-
-		if (!foundAny || bestArea == 0)
-			break;
-
-		// 标记该最大矩形区域为已访问
-		for (int yy = bestY; yy < bestY + bestH; ++yy)
-		{
-			int rowOff = yy * targetW;
-			for (int xx = bestX; xx < bestX + bestW; ++xx)
-			{
-				visited[static_cast<size_t>(rowOff + xx)] = 1;
-			}
-		}
-
-		// 标记 v.processed 并按最小尺寸条件输出窗口
-		for (int yy = bestY; yy < bestY + bestH; ++yy)
-		{
-			int rowOff = yy * targetW; // 使用 targetW，保持与 visited/v.data 的分配一致
-			for (int xx = bestX; xx < bestX + bestW; ++xx)
-			{
-				size_t idx = static_cast<size_t>(rowOff + xx);
-				visited[idx] = 1;
-				v.processed[idx] = true;
-			}
-		}
-		if (bUsedResize)
-			if (max(bestW, bestH) >= RectMinSizeLong / ResizeRatioX && min(bestW, bestH) >= RectMinSizeShort / ResizeRatioY)
-				v.ResizeTemp.push_back({ bestX, bestY, bestX + bestW, bestY + bestH });
-		// 仅当满足最小尺寸要求时创建窗口，与扩展法保持一致
-			else
-				if (max(bestW, bestH) >= RectMinSizeLong && min(bestW, bestH) >= RectMinSizeShort)
-					RectToWindow(bestX + startx, bestY + starty, bestW, bestH);
-
+		wchar_t text[16];
+		wsprintf(text, TEXT("%d"), val);
+		SendMessage(hDisplayHeight, CB_ADDSTRING, 0, (LPARAM)text);
 	}
-}
+
+	const int resizeWidthPresets[] = { 64, 80, 96, 112, 128, 160, 320 };
+	for (int val : resizeWidthPresets)
+	{
+		wchar_t text[16];
+		wsprintf(text, TEXT("%d"), val);
+		SendMessage(hResizeShort, CB_ADDSTRING, 0, (LPARAM)text);
+	}
+
+	const int resizeHeightPresets[] = { 36, 45, 54, 63, 72, 90, 180 };
+	for (int val : resizeHeightPresets)
+	{
+		wchar_t text[16];
+		wsprintf(text, TEXT("%d"), val);
+		SendMessage(hResizeHeight, CB_ADDSTRING, 0, (LPARAM)text);
+	}
+
+	const int minSizePresets[] = { 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32 };
+	for (int val : minSizePresets)
+	{
+		wchar_t text[16];
+		wsprintf(text, TEXT("%d"), val);
+		SendMessage(hRectMinSize, CB_ADDSTRING, 0, (LPARAM)text);
+	}
+
+	int idx = SendMessage(hComputeMethod, CB_ADDSTRING, 0, (LPARAM)TEXT("扩展法 (100)"));
+	SendMessage(hComputeMethod, CB_SETITEMDATA, idx, (LPARAM)EXTEND_METHOD);
+	idx = SendMessage(hComputeMethod, CB_ADDSTRING, 0, (LPARAM)TEXT("贪心算法 (101) 灵感来源：https://github.com/mon/bad_apple_virus,由AI转写"));
+	SendMessage(hComputeMethod, CB_SETITEMDATA, idx, (LPARAM)GREEDY_METHOD);
+	idx = SendMessage(hComputeMethod, CB_ADDSTRING, 0, (LPARAM)TEXT("实验算法 (102) 实验性"));
+	SendMessage(hComputeMethod, CB_SETITEMDATA, idx, (LPARAM)EXPERIMENTAL_METHOD);
+	SendMessage(hComputeMethod, CB_SETCURSEL, 0, 0);
+
+	SendMessage(hRangeMin, CB_SETCURSEL, 0, 0);
+	SendMessage(hRangeMax, CB_SETCURSEL, 0, 0);
+	SendMessage(hDisplayShort, CB_SETCURSEL, 0, 0);
+	SendMessage(hDisplayHeight, CB_SETCURSEL, 0, 0);
+	SendMessage(hResizeShort, CB_SETCURSEL, 0, 0);
+	SendMessage(hResizeHeight, CB_SETCURSEL, 0, 0);
+	SendMessage(hRectMinSize, CB_SETCURSEL, 0, 0);
+	SendMessage(hComputeMethod, CB_SETCURSEL, 0, 0);
+
+};
 
 DWORD WINAPI VTWPARAMS::PlayThread(LPVOID lpParam)
 {
@@ -1491,129 +1391,4 @@ DWORD WINAPI VTWPARAMS::PlayThread(LPVOID lpParam)
 BOOL VTWPARAMS::IsPlayEnded()
 {
 	return v.IsPlayEnded;
-}
-
-// 实验性算法 102：基于行运行长度（run-length）合并的快速矩形生成
-// 思路：先对每行生成连续匹配段（start,end），然后在纵向合并相同列范围的段以生成最大矩形
-// 目标：比扩展法在大块连续区域下更快，并避免多次重复检查
-VOID VTWPARAMS::ComputeWindow_EXPERIMENTAL_METHOD()
-{
-	int targetW = bUsedResize ? ResizeWidth : Width;
-	int targetH = bUsedResize ? ResizeHeight : Height;
-
-	// 清空标记
-	fill(v.processed.begin(), v.processed.end(), false);
-
-	// 每行的段集合，存储为向量的向量：每个段为 pair<start,end>
-	vector<vector<pair<int, int>>> runs(targetH);
-
-    // Parallelize per-row run generation: each row builds its own list (rowRuns) to avoid data races
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
-	for (int y = 0; y < targetH; ++y)
-	{
-		std::vector<std::pair<int, int>> rowRuns;
-		int rowOff = y * targetW;
-		int x = 0;
-		while (x < targetW)
-		{
-			size_t off = static_cast<size_t>(rowOff + x);
-			if (v.processed[off]) { ++x; continue; }
-			uint8_t val = v.data[off].y;
-			bool match = !bInsteadColor ? (val >= MinWhite && val <= MaxWhite) : (val >= MinBlack && val <= MaxBlack);
-			if (!match) { ++x; continue; }
-			int start = x;
-			int end = x;
-			while (end + 1 < targetW)
-			{
-				size_t noff = static_cast<size_t>(rowOff + end + 1);
-				if (v.processed[noff]) break;
-				uint8_t nval = v.data[noff].y;
-				bool nm = !bInsteadColor ? (nval >= MinWhite && nval <= MaxWhite) : (nval >= MinBlack && nval <= MaxBlack);
-				if (!nm) break;
-				++end;
-			}
-			rowRuns.push_back({ start, end });
-			x = end + 1;
-		}
-		runs[y] = std::move(rowRuns);
-	}
-
-    // 合并纵向相同列范围的段，形成矩形
-	struct RectSeg { int sx; int top; int ex; int bottom; };
-	vector<vector<RectSeg>> rectsByRow(targetH);
-
-	// Parallelize detection of vertical merges: each row computes its own rectangles into rectsByRow[y]
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
-	for (int y = 0; y < targetH; ++y)
-	{
-		auto &localRuns = runs[y];
-		auto &localRects = rectsByRow[y];
-		localRects.reserve(localRuns.size());
-		for (auto &seg : localRuns)
-		{
-			int sx = seg.first;
-			int ex = seg.second;
-			int top = y;
-			int bottom = y;
-			// 尝试向下合并（只读取 runs，安全并行）
-			for (int ny = y + 1; ny < targetH; ++ny)
-			{
-				bool found = false;
-				for (auto &nseg : runs[ny])
-				{
-					if (nseg.first <= sx && nseg.second >= ex)
-					{
-						found = true;
-						break;
-					}
-				}
-				if (found) bottom = ny;
-				else break;
-			}
-			localRects.push_back({ sx, top, ex, bottom });
-		}
-	}
-
-	// Serially apply rectangles: mark v.processed and output windows to avoid races
-	for (int y = 0; y < targetH; ++y)
-	{
-		for (auto &r : rectsByRow[y])
-		{
-			int sx = r.sx;
-			int top = r.top;
-			int ex = r.ex;
-			int bottom = r.bottom;
-
-			// skip if already marked (overlap resolved serially)
-			if (v.processed[static_cast<size_t>(top * targetW + sx)]) continue;
-
-			int rectW = ex - sx + 1;
-			int rectH = bottom - top + 1;
-
-			// 标记为已处理
-			for (int yy = top; yy <= bottom; ++yy)
-			{
-				int rowOff = yy * targetW;
-				for (int xx = sx; xx <= ex; ++xx)
-					v.processed[static_cast<size_t>(rowOff + xx)] = true;
-			}
-
-			// 输出窗口（考虑缩放）
-			if (bUsedResize)
-			{
-				if (max(rectW, rectH) >= RectMinSizeLong / ResizeRatioX && min(rectW, rectH) >= RectMinSizeShort / ResizeRatioY)
-					v.ResizeTemp.push_back({ sx, top, sx + rectW, top + rectH });
-			}
-			else
-			{
-				if (max(rectW, rectH) >= RectMinSizeLong && min(rectW, rectH) >= RectMinSizeShort)
-					RectToWindow(sx + startx, top + starty, rectW, rectH);
-			}
-		}
-	}
-
 }
