@@ -282,6 +282,12 @@ VTWPARAMS::VTWPARAMS()
 	d3dDevice = nullptr;
 	d3dContext = nullptr;
 	d3dCS = nullptr;
+	m_gpuInputTex = nullptr;
+	m_gpuInputSRV = nullptr;
+	m_gpuOutTex = nullptr;
+	m_gpuOutUAV = nullptr;
+	m_gpuStagingTex = nullptr;
+	m_gpuConstBuffer = nullptr;
 
 	//音频结构体初始化
 	a.bThreadRunning = FALSE;

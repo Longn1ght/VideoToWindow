@@ -140,6 +140,17 @@ enum COMPUTE_WINDOW_METHOD
 	EXPERIMENTAL_METHOD = 102,
 };
 
+struct GPUParams
+{
+	UINT width;      // 图像宽度
+	UINT height;     // 图像高度
+	UINT minW;       // 白色范围最小值
+	UINT maxW;       // 白色范围最大值
+	UINT minB;       // 黑色范围最小值
+	UINT maxB;       // 黑色范围最大值
+	UINT instead;    // 替代颜色 (0=白, 1=黑)
+	UINT pad;        // 对齐填充（保持16字节对齐）
+};
 
 //为窗口提供一个窗口过程，凑数
 inline INT_PTR CALLBACK VTWProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -181,6 +192,15 @@ private:
 	ID3D11Device* d3dDevice;
 	ID3D11DeviceContext* d3dContext;
 	ID3D11ComputeShader* d3dCS;
+	ID3D11Texture2D* m_gpuInputTex;
+	ID3D11ShaderResourceView* m_gpuInputSRV;
+	ID3D11Texture2D* m_gpuOutTex;
+	ID3D11UnorderedAccessView* m_gpuOutUAV;
+	ID3D11Texture2D* m_gpuStagingTex;
+	ID3D11Buffer* m_gpuConstBuffer;
+	UINT m_gpuLastWidth, m_gpuLastHeight;
+
+	BOOL bGPUInitialized;
 
 	BOOL InitD3DIfNeeded();
 	VOID ReleaseD3D();

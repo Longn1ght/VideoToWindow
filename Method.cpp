@@ -361,7 +361,7 @@ VOID VTWPARAMS::ComputeWindow_EXPERIMENTAL_METHOD()
 	}
 };
 
-BOOL VTWPARAMS::ComputeWindow_EXPERIMENTAL_GPU()
+BBOOL VTWPARAMS::ComputeWindow_EXPERIMENTAL_GPU()
 {
 	if (!bUseGPU) return FALSE;
 	if (!InitD3DIfNeeded()) return FALSE;
@@ -371,149 +371,191 @@ BOOL VTWPARAMS::ComputeWindow_EXPERIMENTAL_GPU()
 	if (targetW <= 0 || targetH <= 0) return FALSE;
 	if (static_cast<size_t>(targetW) * static_cast<size_t>(targetH) > v.planeY.size()) return FALSE;
 
-	ID3D11Texture2D* inputTex = nullptr;
-	ID3D11ShaderResourceView* inputSRV = nullptr;
-	ID3D11Texture2D* outTex = nullptr;
-	ID3D11UnorderedAccessView* outUAV = nullptr;
-	ID3D11Texture2D* stagingTex = nullptr;
-	ID3D11Buffer* cb = nullptr;
+	// 检查尺寸是否变化，若变化则释放旧资源并重新创建
+	if (m_gpuInputTex && (m_gpuLastWidth != targetW || m_gpuLastHeight != targetH)) {
+		// 释放旧资源
+		if (m_gpuInputTex) { m_gpuInputTex->Release();   m_gpuInputTex = nullptr; }
+		if (m_gpuInputSRV) { m_gpuInputSRV->Release();   m_gpuInputSRV = nullptr; }
+		if (m_gpuOutTex) { m_gpuOutTex->Release();     m_gpuOutTex = nullptr; }
+		if (m_gpuOutUAV) { m_gpuOutUAV->Release();     m_gpuOutUAV = nullptr; }
+		if (m_gpuStagingTex) { m_gpuStagingTex->Release(); m_gpuStagingTex = nullptr; }
+		if (m_gpuConstBuffer) { m_gpuConstBuffer->Release(); m_gpuConstBuffer = nullptr; }
+	}
 
-	auto cleanup = [&]() {
-		if (cb) { cb->Release(); cb = nullptr; }
-		if (stagingTex) { stagingTex->Release(); stagingTex = nullptr; }
-		if (outUAV) { outUAV->Release(); outUAV = nullptr; }
-		if (outTex) { outTex->Release(); outTex = nullptr; }
-		if (inputSRV) { inputSRV->Release(); inputSRV = nullptr; }
-		if (inputTex) { inputTex->Release(); inputTex = nullptr; }
-		};
+	// 创建资源（如果尚未创建）
+	if (!m_gpuInputTex) {
+		// create input texture (R8)
+		D3D11_TEXTURE2D_DESC texDesc{};
+		texDesc.Width = targetW; texDesc.Height = targetH; texDesc.MipLevels = 1; texDesc.ArraySize = 1;
+		texDesc.Format = DXGI_FORMAT_R8_UINT; texDesc.SampleDesc.Count = 1; texDesc.Usage = D3D11_USAGE_DEFAULT; texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		D3D11_SUBRESOURCE_DATA initData{}; initData.pSysMem = v.planeY.data(); initData.SysMemPitch = targetW;
+		HRESULT hr = d3dDevice->CreateTexture2D(&texDesc, &initData, &m_gpuInputTex);
+		if (FAILED(hr)) return FALSE;
 
-	// create input texture (R8)
-	D3D11_TEXTURE2D_DESC texDesc{};
-	texDesc.Width = targetW; texDesc.Height = targetH; texDesc.MipLevels = 1; texDesc.ArraySize = 1;
-	texDesc.Format = DXGI_FORMAT_R8_UINT; texDesc.SampleDesc.Count = 1; texDesc.Usage = D3D11_USAGE_DEFAULT; texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-	D3D11_SUBRESOURCE_DATA initData{}; initData.pSysMem = v.planeY.data(); initData.SysMemPitch = targetW;
-	HRESULT hr = d3dDevice->CreateTexture2D(&texDesc, &initData, &inputTex);
-	if (FAILED(hr)) { cleanup(); return FALSE; }
+		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc{}; srvDesc.Format = texDesc.Format; srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D; srvDesc.Texture2D.MipLevels = 1;
+		hr = d3dDevice->CreateShaderResourceView(m_gpuInputTex, &srvDesc, &m_gpuInputSRV);
+		if (FAILED(hr)) return FALSE;
 
-	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc{}; srvDesc.Format = texDesc.Format; srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D; srvDesc.Texture2D.MipLevels = 1;
-	hr = d3dDevice->CreateShaderResourceView(inputTex, &srvDesc, &inputSRV);
-	if (FAILED(hr)) { cleanup(); return FALSE; }
+		// output texture + UAV
+		D3D11_TEXTURE2D_DESC outDesc = texDesc; outDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE; outDesc.Usage = D3D11_USAGE_DEFAULT;
+		hr = d3dDevice->CreateTexture2D(&outDesc, NULL, &m_gpuOutTex);
+		if (FAILED(hr)) return FALSE;
 
-	// output texture + UAV
-	D3D11_TEXTURE2D_DESC outDesc = texDesc; outDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE; outDesc.Usage = D3D11_USAGE_DEFAULT;
-	hr = d3dDevice->CreateTexture2D(&outDesc, NULL, &outTex);
-	if (FAILED(hr)) { cleanup(); return FALSE; }
+		D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc{}; uavDesc.Format = outDesc.Format; uavDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D; uavDesc.Texture2D.MipSlice = 0;
+		hr = d3dDevice->CreateUnorderedAccessView(m_gpuOutTex, &uavDesc, &m_gpuOutUAV);
+		if (FAILED(hr)) return FALSE;
 
-	D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc{}; uavDesc.Format = outDesc.Format; uavDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D; uavDesc.Texture2D.MipSlice = 0;
-	hr = d3dDevice->CreateUnorderedAccessView(outTex, &uavDesc, &outUAV);
-	if (FAILED(hr)) { cleanup(); return FALSE; }
+		// staging for readback
+		D3D11_TEXTURE2D_DESC stagingDesc = outDesc; stagingDesc.Usage = D3D11_USAGE_STAGING; stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ; stagingDesc.BindFlags = 0;
+		hr = d3dDevice->CreateTexture2D(&stagingDesc, NULL, &m_gpuStagingTex);
+		if (FAILED(hr)) return FALSE;
 
-	// staging for readback
-	D3D11_TEXTURE2D_DESC stagingDesc = outDesc; stagingDesc.Usage = D3D11_USAGE_STAGING; stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ; stagingDesc.BindFlags = 0;
-	hr = d3dDevice->CreateTexture2D(&stagingDesc, NULL, &stagingTex);
-	if (FAILED(hr)) { cleanup(); return FALSE; }
+		// constant buffer
+		D3D11_BUFFER_DESC cbDesc{}; cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; cbDesc.ByteWidth = sizeof(GPUParams); cbDesc.Usage = D3D11_USAGE_DEFAULT;
+		hr = d3dDevice->CreateBuffer(&cbDesc, nullptr, &m_gpuConstBuffer);
+		if (FAILED(hr)) return FALSE;
 
-	// constant buffer
+		m_gpuLastWidth = targetW;
+		m_gpuLastHeight = targetH;
+	}
+	else {
+		// 尺寸不变时，只需更新输入纹理内容（因为 v.planeY 每帧会变）
+		D3D11_MAPPED_SUBRESOURCE mappedInput;
+		HRESULT hr = d3dContext->Map(m_gpuInputTex, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedInput);
+		if (SUCCEEDED(hr)) {
+			uint8_t* pDest = (uint8_t*)mappedInput.pData;
+			for (int y = 0; y < targetH; ++y) {
+				for (int x = 0; x < targetW; ++x) {
+					size_t off = y * targetW + x;
+					uint8_t val = v.data[off].y;
+					bool match = !bInsteadColor ? (val >= MinWhite && val <= MaxWhite) : (val >= MinBlack && val <= MaxBlack);
+					pDest[y * mappedInput.RowPitch + x] = match ? 1 : 0;
+				}
+			}
+			d3dContext->Unmap(m_gpuInputTex, 0);
+		}
+		else {
+			return FALSE;
+		}
+	}
+
+	// 更新常量缓冲区
 	struct GPUParams { UINT width; UINT height; UINT minW; UINT maxW; UINT minB; UINT maxB; UINT instead; UINT pad; } params;
-	params.width = (UINT)targetW; params.height = (UINT)targetH; params.minW = (UINT)MinWhite; params.maxW = (UINT)MaxWhite; params.minB = (UINT)MinBlack; params.maxB = (UINT)MaxBlack; params.instead = bInsteadColor ? 1u : 0u; params.pad = 0;
-	D3D11_BUFFER_DESC cbDesc{}; cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; cbDesc.ByteWidth = sizeof(GPUParams); cbDesc.Usage = D3D11_USAGE_DEFAULT; D3D11_SUBRESOURCE_DATA cbd{}; cbd.pSysMem = &params;
-	hr = d3dDevice->CreateBuffer(&cbDesc, &cbd, &cb);
-	if (FAILED(hr)) { cleanup(); return FALSE; }
+	params.width = (UINT)targetW; params.height = (UINT)targetH;
+	params.minW = (UINT)MinWhite; params.maxW = (UINT)MaxWhite;
+	params.minB = (UINT)MinBlack; params.maxB = (UINT)MaxBlack;
+	params.instead = bInsteadColor ? 1u : 0u; params.pad = 0;
+	d3dContext->UpdateSubresource(m_gpuConstBuffer, 0, nullptr, &params, 0, 0);
 
 	// bind and dispatch
 	d3dContext->CSSetShader(d3dCS, NULL, 0);
-	ID3D11ShaderResourceView* srvs[1] = { inputSRV };
+	ID3D11ShaderResourceView* srvs[1] = { m_gpuInputSRV };
 	d3dContext->CSSetShaderResources(0, 1, srvs);
-	ID3D11UnorderedAccessView* uavs[1] = { outUAV };
+	ID3D11UnorderedAccessView* uavs[1] = { m_gpuOutUAV };
 	d3dContext->CSSetUnorderedAccessViews(0, 1, uavs, NULL);
-	d3dContext->CSSetConstantBuffers(0, 1, &cb);
+	d3dContext->CSSetConstantBuffers(0, 1, &m_gpuConstBuffer);
 	UINT gx = (targetW + 15) / 16; UINT gy = (targetH + 15) / 16;
 	d3dContext->Dispatch(gx, gy, 1);
 
 	// read back
-	d3dContext->CopyResource(stagingTex, outTex);
+	d3dContext->CopyResource(m_gpuStagingTex, m_gpuOutTex);
 	D3D11_MAPPED_SUBRESOURCE mapped{};
-	hr = d3dContext->Map(stagingTex, 0, D3D11_MAP_READ, 0, &mapped);
+	HRESULT hr = d3dContext->Map(m_gpuStagingTex, 0, D3D11_MAP_READ, 0, &mapped);
 	if (SUCCEEDED(hr))
 	{
+		// ----- CPU 端后处理：游程提取 + 纵向合并 -----
 		vector<vector<pair<int, int>>> runs(targetH);
-		for (int y = 0; y < targetH; ++y)
+		for (int y = 0; y < targetH; ++y) 
 		{
-			uint8_t* rowPtr = reinterpret_cast<uint8_t*>(reinterpret_cast<uint8_t*>(mapped.pData) + y * mapped.RowPitch);
+			uint8_t* rowPtr = reinterpret_cast<uint8_t*>(static_cast<uint8_t*>(mapped.pData) + y * mapped.RowPitch);
 			vector<pair<int, int>> rowRuns;
 			int x = 0;
 			while (x < targetW)
 			{
-				if (rowPtr[x] == 0) { ++x; continue; }
-				int start = x; int end = x;
-				while (end + 1 < targetW && rowPtr[end + 1]) ++end;
-				rowRuns.push_back({ start, end });
+				if (rowPtr[x] == 0)
+				{ 
+					++x; 
+					continue; 
+				}
+				int start = x, end = x;
+				while (end + 1 < targetW && rowPtr[end + 1]) 
+					++end;
+				rowRuns.emplace_back(start, end);
 				x = end + 1;
 			}
 			runs[y] = std::move(rowRuns);
 		}
+		d3dContext->Unmap(m_gpuStagingTex, 0);
 
-		struct RectSeg { int sx; int top; int ex; int bottom; };
+		struct RectSeg { int sx, top, ex, bottom; };
 		vector<vector<RectSeg>> rectsByRow(targetH);
-		for (int y = 0; y < targetH; ++y)
+		for (int y = 0; y < targetH; ++y) 
 		{
 			auto& localRuns = runs[y];
 			auto& localRects = rectsByRow[y];
 			localRects.reserve(localRuns.size());
-			for (auto& seg : localRuns)
+			for (auto& seg : localRuns) 
 			{
-				int sx = seg.first; int ex = seg.second; int top = y; int bottom = y;
-				for (int ny = y + 1; ny < targetH; ++ny)
+				int sx = seg.first, ex = seg.second, top = y, bottom = y;
+				for (int ny = y + 1; ny < targetH; ++ny) 
 				{
 					bool found = false;
-					for (auto& nseg : runs[ny]) if (nseg.first <= sx && nseg.second >= ex) { found = true; break; }
-					if (found) bottom = ny; else break;
+					for (auto& nseg : runs[ny]) 
+					{
+						if (nseg.first <= sx && nseg.second >= ex) 
+						{ 
+							found = true; 
+							break;
+						}
+					}
+					if (found)
+						bottom = ny;
+					else break;
 				}
 				localRects.push_back({ sx, top, ex, bottom });
 			}
 		}
 
 		fill(v.processed.begin(), v.processed.end(), false);
-		for (int y = 0; y < targetH; ++y)
+		for (int y = 0; y < targetH; ++y) 
 		{
 			for (auto& r : rectsByRow[y])
 			{
-				int sx = r.sx; int top = r.top; int ex = r.ex; int bottom = r.bottom;
-				if (v.processed[static_cast<size_t>(top * targetW + sx)]) continue;
-				int rectW = ex - sx + 1; int rectH = bottom - top + 1;
+				int sx = r.sx, top = r.top, ex = r.ex, bottom = r.bottom;
+				size_t off = static_cast<size_t>(top * targetW + sx);
+				if (v.processed[off]) continue;
+				int rectW = ex - sx + 1, rectH = bottom - top + 1;
 				for (int yy = top; yy <= bottom; ++yy)
 				{
 					int rowOff = yy * targetW;
-					for (int xx = sx; xx <= ex; ++xx)
-						v.processed[static_cast<size_t>(rowOff + xx)] = true;
+					for	(int xx = sx; xx <= ex; ++xx)
+						v.processed[rowOff + xx] = true;
 				}
-				if (bUsedResize)
+				if (bUsedResize) 
 				{
-					if (max(rectW, rectH) >= RectMinSizeLong / ResizeRatioX && min(rectW, rectH) >= RectMinSizeShort / ResizeRatioY)
+					if (max(rectW, rectH) >= RectMinSizeLong / ResizeRatioX &&
+						min(rectW, rectH) >= RectMinSizeShort / ResizeRatioY)
 						v.ResizeTemp.push_back({ sx, top, sx + rectW, top + rectH });
 				}
-				else
+				else 
 				{
 					if (max(rectW, rectH) >= RectMinSizeLong && min(rectW, rectH) >= RectMinSizeShort)
 						RectToWindow(sx + startx, top + starty, rectW, rectH);
 				}
 			}
 		}
-
-		d3dContext->Unmap(stagingTex, 0);
+		d3dContext->Unmap(m_gpuStagingTex, 0);
 	}
 
-	{
-		ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
-		d3dContext->CSSetShaderResources(0, 1, nullSRV);
-		ID3D11UnorderedAccessView* nullUAV[1] = { nullptr };
-		d3dContext->CSSetUnorderedAccessViews(0, 1, nullUAV, nullptr);
-		ID3D11Buffer* nullCB[1] = { nullptr };
-		d3dContext->CSSetConstantBuffers(0, 1, nullCB);
-		d3dContext->CSSetShader(nullptr, nullptr, 0);
-		d3dContext->Flush();
-	}
+	// 清理绑定
+	ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
+	d3dContext->CSSetShaderResources(0, 1, nullSRV);
+	ID3D11UnorderedAccessView* nullUAV[1] = { nullptr };
+	d3dContext->CSSetUnorderedAccessViews(0, 1, nullUAV, nullptr);
+	ID3D11Buffer* nullCB[1] = { nullptr };
+	d3dContext->CSSetConstantBuffers(0, 1, nullCB);
+	d3dContext->CSSetShader(nullptr, nullptr, 0);
+	d3dContext->Flush();
 
-	cleanup();
 	return TRUE;
 }
