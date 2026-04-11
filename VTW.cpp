@@ -647,41 +647,6 @@ const char* VTWPARAMS::GetHWDeviceInfo()
 	return "未使用 GPU 或未检测到设备";
 }
 
-BOOL VTWPARAMS::InitD3DIfNeeded()
-{
-	if (d3dDevice && d3dContext && d3dCS) return TRUE;
-	HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, NULL,
-		D3D11_CREATE_DEVICE_BGRA_SUPPORT, NULL, 0, D3D11_SDK_VERSION,
-		&d3dDevice, NULL, &d3dContext);
-	if (FAILED(hr)) return FALSE;
-
-	const char* csSource =
-		"RWTexture2D<uint> outTex : register(u0);\n"
-		"Texture2D<uint> inTex : register(t0);\n"
-		"cbuffer Params : register(b0) { uint width; uint height; uint minW; uint maxW; uint minB; uint maxB; uint instead; uint pad; };\n"
-		"[numthreads(16,16,1)] void main(uint3 DTid : SV_DispatchThreadID) {\n"
-		"  if (DTid.x >= width || DTid.y >= height) return;\n"
-		"  uint val = inTex.Load(int3(DTid.xy,0)) & 0xFF;\n"
-		"  bool match = (instead == 0) ? (val >= minW && val <= maxW) : (val >= minB && val <= maxB);\n"
-		"  outTex[DTid.xy] = match ? 1u : 0u;\n"
-		"}\n";
-
-	ID3DBlob* blob = nullptr; ID3DBlob* err = nullptr;
-	HRESULT hr2 = D3DCompile(csSource, strlen(csSource), NULL, NULL, NULL, "main", "cs_5_0", 0, 0, &blob, &err);
-	if (FAILED(hr2) || !blob) { if (err) err->Release(); return FALSE; }
-	hr2 = d3dDevice->CreateComputeShader(blob->GetBufferPointer(), blob->GetBufferSize(), NULL, &d3dCS);
-	blob->Release();
-	if (FAILED(hr2)) { if (d3dCS) { d3dCS->Release(); d3dCS = nullptr; } return FALSE; }
-	return TRUE;
-}
-
-VOID VTWPARAMS::ReleaseD3D()
-{
-	if (d3dCS) { d3dCS->Release(); d3dCS = nullptr; }
-	if (d3dContext) { d3dContext->Release(); d3dContext = nullptr; }
-	if (d3dDevice) { d3dDevice->Release(); d3dDevice = nullptr; }
-}
-
 BOOL VTWPARAMS::RequestFrame()
 {
 	while (TRUE)

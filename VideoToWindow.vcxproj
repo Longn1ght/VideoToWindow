@@ -115,7 +115,7 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
@@ -151,9 +151,6 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\svg_1753804035469~1.ico" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include=".github\copilot-instructions.md" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="更新日志.txt" />

@@ -44,9 +44,6 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <None Include=".github\copilot-instructions.md" />
-  </ItemGroup>
-  <ItemGroup>
     <Text Include="更新日志.txt" />
   </ItemGroup>
 </Project>

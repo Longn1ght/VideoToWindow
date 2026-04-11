@@ -361,8 +361,27 @@ VOID VTWPARAMS::ComputeWindow_EXPERIMENTAL_METHOD()
 	}
 };
 
-BBOOL VTWPARAMS::ComputeWindow_EXPERIMENTAL_GPU()
+BOOL VTWPARAMS::ComputeWindow_EXPERIMENTAL_GPU()
 {
+	// ========== 提前定义所有可能被 goto cleanup 跳过的局部变量（初始化为安全值） ==========
+	ID3D11Buffer* stagingCount = nullptr;
+	ID3D11Buffer* stagingRect = nullptr;
+	ID3D11ShaderResourceView* mergeSRVs[1] = { nullptr };
+	ID3D11UnorderedAccessView* mergeUAVs[1] = { nullptr };
+	MergeConstants mergeConst = {};
+	D3D11_MAPPED_SUBRESOURCE map = {};
+	UINT numRuns = 0;
+
+	// 回读矩形部分变量提前
+	D3D11_BUFFER_DESC rectStagingDesc = {};
+	UINT* rectData = nullptr;
+	UINT rectCount = 0;
+
+	// 清理绑定部分变量提前
+	ID3D11ShaderResourceView* nullSRV = nullptr;
+	ID3D11UnorderedAccessView* nullUAV = nullptr;
+	// ================================================================================
+
 	if (!bUseGPU) return FALSE;
 	if (!InitD3DIfNeeded()) return FALSE;
 
@@ -372,8 +391,8 @@ BBOOL VTWPARAMS::ComputeWindow_EXPERIMENTAL_GPU()
 	if (static_cast<size_t>(targetW) * static_cast<size_t>(targetH) > v.planeY.size()) return FALSE;
 
 	// 检查尺寸是否变化，若变化则释放旧资源并重新创建
-	if (m_gpuInputTex && (m_gpuLastWidth != targetW || m_gpuLastHeight != targetH)) {
-		// 释放旧资源
+	if (m_gpuInputTex && (m_gpuLastWidth != targetW || m_gpuLastHeight != targetH))
+	{
 		if (m_gpuInputTex) { m_gpuInputTex->Release();   m_gpuInputTex = nullptr; }
 		if (m_gpuInputSRV) { m_gpuInputSRV->Release();   m_gpuInputSRV = nullptr; }
 		if (m_gpuOutTex) { m_gpuOutTex->Release();     m_gpuOutTex = nullptr; }
@@ -383,8 +402,8 @@ BBOOL VTWPARAMS::ComputeWindow_EXPERIMENTAL_GPU()
 	}
 
 	// 创建资源（如果尚未创建）
-	if (!m_gpuInputTex) {
-		// create input texture (R8)
+	if (!m_gpuInputTex)
+	{
 		D3D11_TEXTURE2D_DESC texDesc{};
 		texDesc.Width = targetW; texDesc.Height = targetH; texDesc.MipLevels = 1; texDesc.ArraySize = 1;
 		texDesc.Format = DXGI_FORMAT_R8_UINT; texDesc.SampleDesc.Count = 1; texDesc.Usage = D3D11_USAGE_DEFAULT; texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -405,6 +424,10 @@ BBOOL VTWPARAMS::ComputeWindow_EXPERIMENTAL_GPU()
 		hr = d3dDevice->CreateUnorderedAccessView(m_gpuOutTex, &uavDesc, &m_gpuOutUAV);
 		if (FAILED(hr)) return FALSE;
 
+		D3D11_SHADER_RESOURCE_VIEW_DESC outSRVDesc = {}; outSRVDesc.Format = outDesc.Format; outSRVDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D; outSRVDesc.Texture2D.MipLevels = 1;
+		hr = d3dDevice->CreateShaderResourceView(m_gpuOutTex, &outSRVDesc, &m_gpuOutSRV);
+		if (FAILED(hr)) return FALSE;
+
 		// staging for readback
 		D3D11_TEXTURE2D_DESC stagingDesc = outDesc; stagingDesc.Usage = D3D11_USAGE_STAGING; stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ; stagingDesc.BindFlags = 0;
 		hr = d3dDevice->CreateTexture2D(&stagingDesc, NULL, &m_gpuStagingTex);
@@ -418,14 +441,17 @@ BBOOL VTWPARAMS::ComputeWindow_EXPERIMENTAL_GPU()
 		m_gpuLastWidth = targetW;
 		m_gpuLastHeight = targetH;
 	}
-	else {
-		// 尺寸不变时，只需更新输入纹理内容（因为 v.planeY 每帧会变）
+	else
+	{
 		D3D11_MAPPED_SUBRESOURCE mappedInput;
 		HRESULT hr = d3dContext->Map(m_gpuInputTex, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedInput);
-		if (SUCCEEDED(hr)) {
+		if (SUCCEEDED(hr))
+		{
 			uint8_t* pDest = (uint8_t*)mappedInput.pData;
-			for (int y = 0; y < targetH; ++y) {
-				for (int x = 0; x < targetW; ++x) {
+			for (int y = 0; y < targetH; ++y)
+			{
+				for (int x = 0; x < targetW; ++x)
+				{
 					size_t off = y * targetW + x;
 					uint8_t val = v.data[off].y;
 					bool match = !bInsteadColor ? (val >= MinWhite && val <= MaxWhite) : (val >= MinBlack && val <= MaxBlack);
@@ -434,13 +460,12 @@ BBOOL VTWPARAMS::ComputeWindow_EXPERIMENTAL_GPU()
 			}
 			d3dContext->Unmap(m_gpuInputTex, 0);
 		}
-		else {
+		else
 			return FALSE;
-		}
 	}
 
 	// 更新常量缓冲区
-	struct GPUParams { UINT width; UINT height; UINT minW; UINT maxW; UINT minB; UINT maxB; UINT instead; UINT pad; } params;
+	GPUParams params;
 	params.width = (UINT)targetW; params.height = (UINT)targetH;
 	params.minW = (UINT)MinWhite; params.maxW = (UINT)MaxWhite;
 	params.minB = (UINT)MinBlack; params.maxB = (UINT)MaxBlack;
@@ -457,105 +482,262 @@ BBOOL VTWPARAMS::ComputeWindow_EXPERIMENTAL_GPU()
 	UINT gx = (targetW + 15) / 16; UINT gy = (targetH + 15) / 16;
 	d3dContext->Dispatch(gx, gy, 1);
 
-	// read back
-	d3dContext->CopyResource(m_gpuStagingTex, m_gpuOutTex);
-	D3D11_MAPPED_SUBRESOURCE mapped{};
-	HRESULT hr = d3dContext->Map(m_gpuStagingTex, 0, D3D11_MAP_READ, 0, &mapped);
-	if (SUCCEEDED(hr))
-	{
-		// ----- CPU 端后处理：游程提取 + 纵向合并 -----
-		vector<vector<pair<int, int>>> runs(targetH);
-		for (int y = 0; y < targetH; ++y) 
-		{
-			uint8_t* rowPtr = reinterpret_cast<uint8_t*>(static_cast<uint8_t*>(mapped.pData) + y * mapped.RowPitch);
-			vector<pair<int, int>> rowRuns;
-			int x = 0;
-			while (x < targetW)
-			{
-				if (rowPtr[x] == 0)
-				{ 
-					++x; 
-					continue; 
-				}
-				int start = x, end = x;
-				while (end + 1 < targetW && rowPtr[end + 1]) 
-					++end;
-				rowRuns.emplace_back(start, end);
-				x = end + 1;
-			}
-			runs[y] = std::move(rowRuns);
-		}
-		d3dContext->Unmap(m_gpuStagingTex, 0);
-
-		struct RectSeg { int sx, top, ex, bottom; };
-		vector<vector<RectSeg>> rectsByRow(targetH);
-		for (int y = 0; y < targetH; ++y) 
-		{
-			auto& localRuns = runs[y];
-			auto& localRects = rectsByRow[y];
-			localRects.reserve(localRuns.size());
-			for (auto& seg : localRuns) 
-			{
-				int sx = seg.first, ex = seg.second, top = y, bottom = y;
-				for (int ny = y + 1; ny < targetH; ++ny) 
-				{
-					bool found = false;
-					for (auto& nseg : runs[ny]) 
-					{
-						if (nseg.first <= sx && nseg.second >= ex) 
-						{ 
-							found = true; 
-							break;
-						}
-					}
-					if (found)
-						bottom = ny;
-					else break;
-				}
-				localRects.push_back({ sx, top, ex, bottom });
-			}
-		}
-
-		fill(v.processed.begin(), v.processed.end(), false);
-		for (int y = 0; y < targetH; ++y) 
-		{
-			for (auto& r : rectsByRow[y])
-			{
-				int sx = r.sx, top = r.top, ex = r.ex, bottom = r.bottom;
-				size_t off = static_cast<size_t>(top * targetW + sx);
-				if (v.processed[off]) continue;
-				int rectW = ex - sx + 1, rectH = bottom - top + 1;
-				for (int yy = top; yy <= bottom; ++yy)
-				{
-					int rowOff = yy * targetW;
-					for	(int xx = sx; xx <= ex; ++xx)
-						v.processed[rowOff + xx] = true;
-				}
-				if (bUsedResize) 
-				{
-					if (max(rectW, rectH) >= RectMinSizeLong / ResizeRatioX &&
-						min(rectW, rectH) >= RectMinSizeShort / ResizeRatioY)
-						v.ResizeTemp.push_back({ sx, top, sx + rectW, top + rectH });
-				}
-				else 
-				{
-					if (max(rectW, rectH) >= RectMinSizeLong && min(rectW, rectH) >= RectMinSizeShort)
-						RectToWindow(sx + startx, top + starty, rectW, rectH);
-				}
-			}
-		}
-		d3dContext->Unmap(m_gpuStagingTex, 0);
+	// ---------- 2. 游程提取 ----------
+	UINT maxRunsEst = (targetW * targetH + 1) / 2;
+	if (!m_runBuffer || m_maxRuns < maxRunsEst) {
+		if (m_runBuffer) { m_runBuffer->Release(); m_runUAV->Release(); }
+		D3D11_BUFFER_DESC bufDesc = {};
+		bufDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+		bufDesc.ByteWidth = maxRunsEst * 3 * sizeof(UINT);
+		bufDesc.StructureByteStride = sizeof(UINT);
+		bufDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		d3dDevice->CreateBuffer(&bufDesc, nullptr, &m_runBuffer);
+		d3dDevice->CreateUnorderedAccessView(m_runBuffer, nullptr, &m_runUAV);
+		d3dDevice->CreateShaderResourceView(m_runBuffer, nullptr, &m_runSRV);
+		m_maxRuns = maxRunsEst;
+	}
+	if (!m_runCountBuffer) {
+		D3D11_BUFFER_DESC cntDesc = {};
+		cntDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+		cntDesc.ByteWidth = sizeof(UINT);
+		d3dDevice->CreateBuffer(&cntDesc, nullptr, &m_runCountBuffer);
+		d3dDevice->CreateUnorderedAccessView(m_runCountBuffer, nullptr, &m_runCountUAV);
 	}
 
-	// 清理绑定
-	ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
-	d3dContext->CSSetShaderResources(0, 1, nullSRV);
-	ID3D11UnorderedAccessView* nullUAV[1] = { nullptr };
-	d3dContext->CSSetUnorderedAccessViews(0, 1, nullUAV, nullptr);
-	ID3D11Buffer* nullCB[1] = { nullptr };
-	d3dContext->CSSetConstantBuffers(0, 1, nullCB);
+	UINT zero = 0;
+	d3dContext->UpdateSubresource(m_runCountBuffer, 0, nullptr, &zero, 0, 0);
+
+	d3dContext->CSSetShader(m_csExtractRuns, nullptr, 0);
+	ID3D11ShaderResourceView* extractSRVs[] = { m_gpuOutSRV };
+	d3dContext->CSSetShaderResources(0, 1, extractSRVs);
+	ID3D11UnorderedAccessView* extractUAVs[] = { m_runUAV, m_runCountUAV };
+	d3dContext->CSSetUnorderedAccessViews(0, 2, extractUAVs, nullptr);
+	d3dContext->CSSetConstantBuffers(0, 1, &m_gpuConstBuffer);
+	d3dContext->Dispatch((targetW + 255) / 256, targetH, 1);
+
+	d3dContext->Flush();
+
+	// 获取游程数量
+	stagingCount = nullptr;
+	D3D11_BUFFER_DESC stagingDesc = {};
+	stagingDesc.ByteWidth = sizeof(UINT);
+	stagingDesc.Usage = D3D11_USAGE_STAGING;
+	stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+	d3dDevice->CreateBuffer(&stagingDesc, nullptr, &stagingCount);
+	d3dContext->CopyResource(stagingCount, m_runCountBuffer);
+	d3dContext->Map(stagingCount, 0, D3D11_MAP_READ, 0, &map);
+	numRuns = *(UINT*)map.pData;
+	d3dContext->Unmap(stagingCount, 0);
+	stagingCount->Release();
+	stagingCount = nullptr;
+
+	if (numRuns == 0) {
+		goto cleanup;
+	}
+
+	// ---------- 3. 纵向合并 ----------
+	if (!m_rectBuffer) {
+		D3D11_BUFFER_DESC rectDesc = {};
+		rectDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+		rectDesc.ByteWidth = m_maxRuns * 4 * sizeof(UINT);
+		rectDesc.StructureByteStride = sizeof(UINT) * 4;
+		rectDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		d3dDevice->CreateBuffer(&rectDesc, nullptr, &m_rectBuffer);
+		d3dDevice->CreateUnorderedAccessView(m_rectBuffer, nullptr, &m_rectUAV);
+	}
+	else {
+		// 可在此处添加重置 Append 缓冲区的逻辑（如有需要）
+	}
+
+	d3dContext->CSSetShader(m_csMergeVertical, nullptr, 0);
+	mergeSRVs[0] = m_runSRV;          // 赋值替代定义
+	d3dContext->CSSetShaderResources(0, 1, mergeSRVs);
+	mergeUAVs[0] = m_rectUAV;         // 赋值替代定义
+	d3dContext->CSSetUnorderedAccessViews(0, 1, mergeUAVs, nullptr);
+
+	mergeConst.w = targetW;           // 使用提前定义的结构体变量
+	mergeConst.h = targetH;
+	mergeConst.numRuns = numRuns;
+	mergeConst.pad = 0;
+	d3dContext->UpdateSubresource(m_gpuConstBuffer, 0, nullptr, &mergeConst, 0, 0);
+	d3dContext->CSSetConstantBuffers(0, 1, &m_gpuConstBuffer);
+	d3dContext->Dispatch((numRuns + 63) / 64, 1, 1);
+
+	// ---------- 4. 回读矩形并创建窗口 ----------
+	stagingRect = nullptr;
+	rectStagingDesc = {};                      // 重新赋值（替代原处定义）
+	rectStagingDesc.ByteWidth = m_maxRuns * 4 * sizeof(UINT);
+	rectStagingDesc.Usage = D3D11_USAGE_STAGING;
+	rectStagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+	d3dDevice->CreateBuffer(&rectStagingDesc, nullptr, &stagingRect);
+	d3dContext->CopyResource(stagingRect, m_rectBuffer);
+	d3dContext->Map(stagingRect, 0, D3D11_MAP_READ, 0, &map);
+	rectData = (UINT*)map.pData;               // 赋值替代定义
+	rectCount = 0;                             // 赋值替代定义
+	for (UINT i = 0; i < numRuns; ++i) {
+		UINT left = rectData[i * 4 + 0];
+		UINT top = rectData[i * 4 + 1];
+		UINT right = rectData[i * 4 + 2];
+		UINT bottom = rectData[i * 4 + 3];
+		if (left == 0 && top == 0 && right == 0 && bottom == 0) break;
+		rectCount++;
+		int w = right - left + 1;
+		int h = bottom - top + 1;
+		if (bUsedResize) {
+			if (max(w, h) >= RectMinSizeLong / ResizeRatioX && min(w, h) >= RectMinSizeShort / ResizeRatioY)
+				v.ResizeTemp.push_back({ (int)left, (int)top, (int)right, (int)bottom });
+		}
+		else {
+			if (max(w, h) >= RectMinSizeLong && min(w, h) >= RectMinSizeShort)
+				RectToWindow((int)left + startx, (int)top + starty, w, h);
+		}
+	}
+	d3dContext->Unmap(stagingRect, 0);
+	stagingRect->Release();
+	stagingRect = nullptr;
+
+	// 清除绑定
+	nullSRV = nullptr;                         // 赋值替代定义
+	nullUAV = nullptr;                         // 赋值替代定义
+	d3dContext->CSSetShaderResources(0, 1, &nullSRV);
+	d3dContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
 	d3dContext->CSSetShader(nullptr, nullptr, 0);
 	d3dContext->Flush();
 
 	return TRUE;
+
+cleanup:
+	// 错误路径：释放可能已分配的临时资源
+	if (stagingCount) stagingCount->Release();
+	if (stagingRect) stagingRect->Release();
+	// 清除绑定
+	ID3D11ShaderResourceView* _nullSRV = nullptr;
+	ID3D11UnorderedAccessView* _nullUAV = nullptr;
+	d3dContext->CSSetShaderResources(0, 1, &_nullSRV);
+	d3dContext->CSSetUnorderedAccessViews(0, 1, &_nullUAV, nullptr);
+	d3dContext->CSSetShader(nullptr, nullptr, 0);
+	d3dContext->Flush();
+	return FALSE;
+}
+
+BOOL VTWPARAMS::InitD3DIfNeeded()
+{
+	if (d3dDevice && d3dContext && d3dCS) return TRUE;
+	HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, NULL,
+		D3D11_CREATE_DEVICE_BGRA_SUPPORT, NULL, 0, D3D11_SDK_VERSION,
+		&d3dDevice, NULL, &d3dContext);
+	if (FAILED(hr)) return FALSE;
+
+	const char* csSource =
+		"RWTexture2D<uint> outTex : register(u0);\n"
+		"Texture2D<uint> inTex : register(t0);\n"
+		"cbuffer Params : register(b0) { uint width; uint height; uint minW; uint maxW; uint minB; uint maxB; uint instead; uint pad; };\n"
+		"[numthreads(16,16,1)] void main(uint3 DTid : SV_DispatchThreadID) {\n"
+		"  if (DTid.x >= width || DTid.y >= height) return;\n"
+		"  uint val = inTex.Load(int3(DTid.xy,0)) & 0xFF;\n"
+		"  bool match = (instead == 0) ? (val >= minW && val <= maxW) : (val >= minB && val <= maxB);\n"
+		"  outTex[DTid.xy] = match ? 1u : 0u;\n"
+		"}\n";
+
+	ID3DBlob* blob = nullptr; ID3DBlob* err = nullptr;
+	HRESULT hr2 = D3DCompile(csSource, strlen(csSource), NULL, NULL, NULL, "main", "cs_5_0", 0, 0, &blob, &err);
+	if (FAILED(hr2) || !blob) { if (err) err->Release(); return FALSE; }
+	hr2 = d3dDevice->CreateComputeShader(blob->GetBufferPointer(), blob->GetBufferSize(), NULL, &d3dCS);
+	blob->Release();
+	if (FAILED(hr2)) { if (d3dCS) { d3dCS->Release(); d3dCS = nullptr; } return FALSE; }
+
+	const char* extractRunsCode = R"(
+Texture2D<uint> inputTex : register(t0);
+RWStructuredBuffer<uint> runBuffer : register(u0);
+RWStructuredBuffer<uint> runCount : register(u1);
+
+cbuffer Constants : register(b0) {
+    uint width, height;
+    uint minW, maxW, minB, maxB;
+    uint instead, pad;
+};
+
+bool isWhite(uint2 pos) {
+    uint val = inputTex[pos];
+    if (instead == 0) return (val >= minW && val <= maxW);
+    else return (val >= minB && val <= maxB);
+}
+
+[numthreads(256, 1, 1)]
+void CS_ExtractRuns(uint3 id : SV_DispatchThreadID, uint3 gtid : SV_GroupThreadID, uint3 gid : SV_GroupID) {
+    uint row = gid.y;
+    if (row >= height) return;
+    uint x = id.x;
+    if (x >= width) return;
+    if (!isWhite(uint2(x, row))) return;
+    if (x > 0 && isWhite(uint2(x-1, row))) return; // 不是起点
+
+    uint end = x;
+    while (end+1 < width && isWhite(uint2(end+1, row))) ++end;
+
+    uint idx;
+    InterlockedAdd(runCount[0], 1, idx);
+    uint base = idx * 3;
+    runBuffer[base] = row;
+    runBuffer[base+1] = x;
+    runBuffer[base+2] = end;
+}
+)";
+
+	const char* mergeVerticalCode = R"(
+StructuredBuffer<uint> runBuffer : register(t0);
+AppendStructuredBuffer<uint4> rectBuffer : register(u0);
+
+cbuffer Constants : register(b0) {
+    uint width, height;
+    uint numRuns;
+    uint pad;
+};
+
+[numthreads(64, 1, 1)]
+void CS_MergeVertical(uint3 id : SV_DispatchThreadID) {
+    uint idx = id.x;
+    if (idx >= numRuns) return;
+    uint base = idx * 3;
+    uint row = runBuffer[base];
+    uint start = runBuffer[base+1];
+    uint end   = runBuffer[base+2];
+    uint bottom = row;
+    for (uint ny = row+1; ny < height; ++ny) {
+        bool covered = false;
+        for (uint j = 0; j < numRuns; ++j) {
+            uint jbase = j * 3;
+            if (runBuffer[jbase] == ny && runBuffer[jbase+1] <= start && runBuffer[jbase+2] >= end) {
+                covered = true;
+                break;
+            }
+        }
+        if (!covered) break;
+        bottom = ny;
+    }
+    rectBuffer.Append(uint4(start, row, end, bottom));
+}
+)";
+
+	// 编译 m_csExtractRuns
+	ID3DBlob* csExtractblob = nullptr;
+	D3DCompile(extractRunsCode, strlen(extractRunsCode), nullptr, nullptr, nullptr,
+		"CS_ExtractRuns", "cs_5_0", 0, 0, &csExtractblob, nullptr);
+	d3dDevice->CreateComputeShader(csExtractblob->GetBufferPointer(), csExtractblob->GetBufferSize(), nullptr, &m_csExtractRuns);
+	csExtractblob->Release();
+
+	// 编译 m_csMergeVertical 类似，入口点 "CS_MergeVertical"
+	ID3DBlob* csMergeblob = nullptr;
+	D3DCompile(mergeVerticalCode, strlen(mergeVerticalCode), nullptr, nullptr, nullptr,
+		"CS_MergeVertical", "cs_5_0", 0, 0, &csMergeblob, nullptr);
+	d3dDevice->CreateComputeShader(csMergeblob->GetBufferPointer(), csMergeblob->GetBufferSize(), nullptr, &m_csMergeVertical);
+	csMergeblob->Release();
+	return TRUE;
+}
+
+VOID VTWPARAMS::ReleaseD3D()
+{
+	if (d3dCS) { d3dCS->Release(); d3dCS = nullptr; }
+	if (d3dContext) { d3dContext->Release(); d3dContext = nullptr; }
+	if (d3dDevice) { d3dDevice->Release(); d3dDevice = nullptr; }
 }

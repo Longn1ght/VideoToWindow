@@ -152,6 +152,11 @@ struct GPUParams
 	UINT pad;        // 对齐填充（保持16字节对齐）
 };
 
+struct MergeConstants
+{
+	UINT w, h, numRuns, pad;
+};
+
 //为窗口提供一个窗口过程，凑数
 inline INT_PTR CALLBACK VTWProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -194,11 +199,22 @@ private:
 	ID3D11ComputeShader* d3dCS;
 	ID3D11Texture2D* m_gpuInputTex;
 	ID3D11ShaderResourceView* m_gpuInputSRV;
+	ID3D11ShaderResourceView* m_gpuOutSRV;
 	ID3D11Texture2D* m_gpuOutTex;
 	ID3D11UnorderedAccessView* m_gpuOutUAV;
 	ID3D11Texture2D* m_gpuStagingTex;
 	ID3D11Buffer* m_gpuConstBuffer;
 	UINT m_gpuLastWidth, m_gpuLastHeight;
+	ID3D11Buffer* m_runBuffer;
+	ID3D11UnorderedAccessView* m_runUAV;
+	ID3D11Buffer* m_runCountBuffer;
+	ID3D11UnorderedAccessView* m_runCountUAV;
+	ID3D11Buffer* m_rectBuffer;
+	ID3D11UnorderedAccessView* m_rectUAV;
+	ID3D11ShaderResourceView* m_runSRV;      // 游程缓冲区的 SRV，供纵向合并使用
+	ID3D11ComputeShader* m_csExtractRuns;
+	ID3D11ComputeShader* m_csMergeVertical;
+	UINT m_maxRuns;
 
 	BOOL bGPUInitialized;
 
